@@ -1,5 +1,9 @@
 # M14 — TODO · Group Discussion Arena
 
+> **Completion: 0%** — 0 of 21 functional requirements met. **No repository.** The spec is written and, for several modules, reviewed; nothing is built. The requirement count is the spec's own, so this is a measure of scope ahead rather than of progress behind.
+>
+> _Method: `(met + ½ × partial) ÷ total`, counted from the spec, 2026-08-28. One measure applied the same way to all nineteen modules so they compare; it counts requirements, not screens or gates._
+
 Task list for taking **M14 — Group Discussion Arena** to 100% of [M14_GD_Arena.md](M14_GD_Arena.md).
 
 > **This is the branch that holds the plan.** The `todo` branch carries the
@@ -14,6 +18,27 @@ Task list for taking **M14 — Group Discussion Arena** to 100% of [M14_GD_Arena
 - **Repo:** `GD_Arena`
 
 Legend: ✅ done · 🟡 partly done · ⬜ not started
+
+---
+
+### 2026-10-05 — from the voice research (M11, Revision 2)
+
+- **FR-14.7 (an AI participant yields within 350 ms when a human speaks)** maps
+  onto Revision 2's browser VAD: the stop happens in the browser, before any
+  network round trip.
+- **Distinct voices for several AI participants.** Edge has only two neural
+  Indian-English voices (Neerja, Prabhat), so a five-person GD needs more: other
+  English neural voices (en-GB, en-US) chosen by each participant's `voice_id`,
+  or Kokoro's American and British voices as M11's tier 1. Indian-language
+  neural voices exist too (Hindi, Bengali, Gujarati, Kannada and more), should
+  a vernacular round ever be wanted.
+- **Trap 5's SFU:** LiveKit (Apache-2.0) is the open choice Revision 2 names
+  for multi-party audio.
+- **Avatars:** the spec's open question says abstract avatars with names, no
+  faces. M06's drawn faces — which talk since 2026-10-05 — and the face options
+  in M11's §15.6 are there if that changes.
+- When M14 starts, M06's voice client (`voice-core.ts`, `voice.ts`) graduates
+  to Platform_Core rather than being copied (M11 TODO §6).
 
 ---
 
