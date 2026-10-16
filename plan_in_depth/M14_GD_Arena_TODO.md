@@ -1,8 +1,8 @@
 # M14 — TODO · Group Discussion Arena
 
-> **Completion: 0%** — 0 of 21 functional requirements met. **No repository.** The spec is written and, for several modules, reviewed; nothing is built. The requirement count is the spec's own, so this is a measure of scope ahead rather than of progress behind.
+> **Completion: 33%** — 2 of 21 functional requirements met, 10 partially. A GD platform exists — built by GS Adithya Krishna and abhinav from 2026-10-04, **on branches** (`groq-edge-tts` holds all of it; `main` has only the initial commit) and to its own design document (`claude/docs/design.md`) rather than this spec. So it meets several requirements by a different route and misses the spec's distinctive ones: the discourse graph, anti-convergence, speculative pre-generation, missed entry moments. It is not yet on Platform_Core or in the shell.
 >
-> _Method: `(met + ½ × partial) ÷ total`, counted from the spec, 2026-08-28. One measure applied the same way to all nineteen modules so they compare; it counts requirements, not screens or gates._
+> _Method: `(met + ½ × partial) ÷ total`, counted from the spec, 2026-08-28; audited against the `groq-edge-tts` branch's code on 2026-10-17 (0% → 33%). One measure applied the same way to all nineteen modules so they compare; it counts requirements, not screens or gates._
 
 Task list for taking **M14 — Group Discussion Arena** to 100% of [M14_GD_Arena.md](M14_GD_Arena.md).
 
@@ -20,6 +20,40 @@ Task list for taking **M14 — Group Discussion Arena** to 100% of [M14_GD_Arena
 Legend: ✅ done · 🟡 partly done · ⬜ not started
 
 ---
+
+### 2026-10-17 — what the team built, audited against this spec
+
+Built by GS Adithya Krishna (2026-10-04 to 10-07) and abhinav (2026-10-10):
+
+| Branch | Commits | What it adds |
+|---|---|---|
+| `main` | 1 | Initial commit only (2026-10-04) |
+| `demo` | 2 | One-step start script, a no-Docker mode |
+| `arena-modes` | 4 | Student lobbies, AI practice mode, agentic evaluation, an immersive UI; practice speaks one voice at a time and listens before replying |
+| `groq-edge-tts` | 7 | All of the above, plus Edge TTS voices, a Gemini/Groq OpenAI-compatible provider, agent-written personal reports, a UI redesign, and tests |
+
+**What it is.** A FastAPI backend (`services/`: auth, session, lobby,
+realtime, speech, metrics, observer, evaluation, practice, notifications) and
+a Next.js frontend, on Postgres, Redis, LiveKit and MinIO in Docker (SQLite
+and no Redis in its no-Docker mode). Live discussion is decoupled from
+evaluation: speech in 45-second windows → Whisper → transcript segments; a
+metrics engine in code (speaking time, turns, interruptions, overlap, who
+addressed whom); an Observer agent's rolling state; at the end a LangGraph
+supervisor fans out to specialist evaluator agents, a deterministic
+aggregator computes the score, and a synthesis agent writes the report
+through tools that cannot change it. Its README counts **301 tests**
+(offline, stubbed STT and LLM); not run in this audit.
+
+**Where it stands against the platform — the integration work, not yet started:**
+
+- ⬜ **Not on Platform_Core.** Its own accounts and JWT (`services/auth`), not
+  `ai_core.identity` and the shell's session; no `module.json`, no
+  `candidate_guard`, no service secret.
+- ⬜ **Not in the shell.** A separate Next.js app on `:3000` with its API on
+  `:8000`; the platform's port plan has no M14 entry yet.
+- ⬜ **Nothing reaches the skill graph or M13.** Its evaluation is its own;
+  the spec's M13/M19 seams are untouched.
+- ⬜ **Nothing is on `main`.** Merging `groq-edge-tts` is the team's call.
 
 ### 2026-10-05 — from the voice research (M11, Revision 2)
 
@@ -60,44 +94,44 @@ _Nothing scouted for this module yet._
 
 | | |
 |---|---|
-| Status | **Not started.** No code exists — no backend, no frontend, no tests. |
+| Status | **Built on branches, to its own design.** `groq-edge-tts` (7 commits, 2026-10-04 → 10-10): backend, frontend and tests; `main` holds the initial commit only. Not on Platform_Core, not in the shell. |
 | Spec | Written, and the source of every row below. |
 | Scope | 21 functional requirements (17 of them P0), 11 acceptance metrics (5 release-blocking), 15 edge cases. |
+| Tests | **301** by its README (offline: in-memory SQLite, stubbed STT and LLM); not run in the 2026-10-17 audit |
 
-Everything below is ⬜ because nothing is built. That is the honest state and
-it is worth writing down rather than leaving three sections saying
-_To fill in._ — the point of this list is that the next session can start from
-it instead of re-reading a six-hundred-line spec.
+The requirement table below was audited against the `groq-edge-tts` branch's
+code on 2026-10-17. The acceptance gates, edge cases and data model below it
+have not been walked against that code yet.
 
 ---
 
 ## 2. Functional requirements
 
-Spec §4, verbatim. This is the authoritative list.
+Spec §4, verbatim; status from the 2026-10-17 audit of `groq-edge-tts`.
 
 | FR | | Priority |
 |---|---|---|
-| FR-14.1 | ⬜ Three modes: solo-vs-AI, humans-only, hybrid | P0 |
-| FR-14.2 | ⬜ Formats: topic, case-based, for/against (assigned stance), fishbowl | P1 |
-| FR-14.3 | ⬜ AI moderator running a phase machine with time control | P0 |
-| FR-14.4 | ⬜ 3–5 AI panelists with sampled divergent stances and private knowledge | P0 |
+| FR-14.1 | 🟡 Three modes: solo-vs-AI, humans-only, hybrid — solo practice against AI personas and humans-only group rooms exist; no hybrid room (one practice room per student) | P0 |
+| FR-14.2 | 🟡 Formats: topic, case-based, for/against (assigned stance), fishbowl — open-topic GDs only, typed technical / leadership / HR-social / general | P1 |
+| FR-14.3 | 🟡 AI moderator running a phase machine with time control — the phase machine and clock are code (preparation → live → ending → ended; practice timing phases); no AI moderator, though one persona plays a diplomat | P0 |
+| FR-14.4 | 🟡 3–5 AI panelists with sampled divergent stances and private knowledge — personas with distinct briefs and eagerness (the analyst, the devil's advocate, the diplomat …); stances are not sampled and there is no private knowledge | P0 |
 | FR-14.5 | ⬜ Anti-convergence: repetition-similarity block on contributions | P0 |
-| FR-14.6 | ⬜ Floor-control scheduler with a bid model | P0 |
-| FR-14.7 | ⬜ Human speech always wins the floor; AI yields ≤ 350 ms | P0 |
+| FR-14.6 | 🟡 Floor-control scheduler with a bid model — a weighted pick by eagerness, with chained follow-ons; no bid model | P0 |
+| FR-14.7 | 🟡 Human speech always wins the floor; AI yields ≤ 350 ms — the browser's VAD cuts a persona's playback when the student speaks, recorded as an interruption; the 350 ms bound is not measured | P0 |
 | FR-14.8 | ⬜ Speculative pre-generation of the next 2 bidders' contributions | P0 |
-| FR-14.9 | ⬜ Multi-human rooms over an SFU, up to 8 participants | P0 |
-| FR-14.10 | ⬜ Invite links, lobby, host controls, late join, reconnect | P0 |
-| FR-14.11 | ⬜ Live speaking-time counters for all participants | P0 |
+| FR-14.9 | ✅ Multi-human rooms over an SFU, up to 8 participants — LiveKit; `max_participants` defaults to 8 | P0 |
+| FR-14.10 | 🟡 Invite links, lobby, host controls, late join, reconnect — six-character join code, email invites that reserve a seat, a lobby with ready marks, host start and end, reconnect after a drop; late join not found | P0 |
+| FR-14.11 | ⬜ Live speaking-time counters for all participants — a live speaking indicator only; speaking time appears in the report | P0 |
 | FR-14.12 | ⬜ Optional raise-hand with moderator invitation | P1 |
 | FR-14.13 | ⬜ "Recent ideas" strip | P1 |
-| FR-14.14 | ⬜ Discourse graph construction with typed edges | P0 |
-| FR-14.15 | ⬜ Contribution scoring: novelty, uptake, floor dynamics, entry skill, listening, closure | P0 |
-| FR-14.16 | ⬜ Domination index separating leading from bulldozing | P0 |
+| FR-14.14 | ⬜ Discourse graph construction with typed edges — the metrics engine builds a who-addressed-whom graph between speakers, not typed edges between contributions | P0 |
+| FR-14.15 | 🟡 Contribution scoring: novelty, uptake, floor dynamics, entry skill, listening, closure — specialist evaluator agents and code-measured turns, interruptions and latency, on its own dimensions rather than these six | P0 |
+| FR-14.16 | 🟡 Domination index separating leading from bulldozing — a floor-share flag (`dominant()`, ≥ 30%) and a rubric that marks dominating-not-directing down; no index | P0 |
 | FR-14.17 | ⬜ Missed-entry-moment detection with audio playback | P1 |
-| FR-14.18 | ⬜ Private individual debriefs; no public quality ranking | P0 |
+| FR-14.18 | ✅ Private individual debriefs; no public quality ranking — each candidate sees only their own report; the host sees the group report; nothing ranks | P0 |
 | FR-14.19 | ⬜ Text GD mode with the same scheduler and scoring | P0 |
-| FR-14.20 | ⬜ Overlap < 4% of wall clock in a 5-participant session | P0 |
-| FR-14.21 | ⬜ AI contribution latency after floor grant p95 < 800 ms | P0 |
+| FR-14.20 | 🟡 Overlap < 4% of wall clock in a 5-participant session — overlap is measured; the target is not demonstrated | P0 |
+| FR-14.21 | ⬜ AI contribution latency after floor grant p95 < 800 ms — not measured | P0 |
 
 ---
 
@@ -148,7 +182,7 @@ difference between a demo and a product.
 
 ## 5. Data model
 
-Spec §5 declares 9 types. None exist.
+Spec §5 declares 9 types. None exist under these names; the `groq-edge-tts` branch has its own (`GDSession`, participants, transcript segments, turns, evaluation outputs), not yet mapped onto these.
 
 | Type | | |
 |---|---|---|
@@ -178,7 +212,7 @@ begin.
 
 ## 7. First moves
 
-When work begins, the order that has worked on M01 and M02:
+Work has begun outside the platform (the 2026-10-17 audit above). Bringing it in, the order that has worked on M01 and M02 still applies, as integration rather than a blank page:
 
 1. **The manifest and the ports.** `module.json` with `depends_on` declaring
    every upstream as OPTIONAL, each with an `on_missing` sentence a student
