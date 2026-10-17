@@ -21,6 +21,97 @@ Legend: ✅ done · 🟡 partly done · ⬜ not started
 
 ---
 
+### 2026-10-17 — the plan: wrap GD by Wed 21 Oct
+
+All wrap-up work lands on branch **`wrap-up`** (cut from `groq-edge-tts`, which
+holds everything the team built); `main` gets it on Day 5. Owners are
+suggested from who built each part — adjust them.
+
+| Day | Goal | Work | Owner (suggested) | Done when |
+|---|---|---|---|---|
+| **1 · Sat 17 Oct** | It runs on today's keys | Commit the two model fixes with tests (blockers 1–2 below); fix the database lock — LLM work outside write transactions, the job visible the moment it exists, SQLite in WAL mode (3); pace calls from Groq's remaining-tokens header and fall back to the other model instead of sleeping, one organization's key only (4); `edge-tts` in requirements, `.env.example` for Groq and Edge (5) | Ansh | the scripted practice gives persona lines and a report, and nothing 500s while the report is made |
+| **2 · Sun 18 Oct** | A panel that behaves like one | A moderator persona: an opening round that invites the student (EC-14.1), a redirect when one voice dominates (EC-14.2), a closing call (FR-14.3); stances sampled per persona (FR-14.4); an anti-convergence block, and a curveball after three yields (FR-14.5, EC-14.4); a bid scheduler — eagerness × relevance × time since last turn (FR-14.6); personas admit they are AI when asked (AC-14.5, EC-14.14); no invented statistics (6) | Adithya | a scripted session in which every persona speaks, none repeats another, and "are you a bot?" gets an honest answer |
+| **3 · Mon 19 Oct** | What the student sees | Text GD mode — typed turns, same scheduler and scoring (FR-14.19); live speaking-time bars (FR-14.11); a recent-ideas strip (FR-14.13); raise-hand (FR-14.12); a silent student's report that encourages and does not contradict itself (EC-14.1, blocker 8) | abhinav | a whole session typed, bars moving live, and a silent student's report a teacher would sign |
+| **4 · Tue 20 Oct** | Part of the platform | Sign in with the platform session (Platform_Core identity), not a second account; ports 8114 / 5214 and the platform's start script; a "Group discussion" entry in the shell; GD results reach the skill graph as M04 observations; measure barge-in (AC-14.2, ≤ 350 ms) and floor grant → first audio (AC-14.6, ≤ 800 ms) | Ansh | a student signed in on `:5173` opens GD, practises, and their skill graph moves |
+| **5 · Wed 21 Oct** | Proven and merged | Walk the 5 gates and 15 edge cases and write the results here; a two-browser human room on Docker/LiveKit; merge `wrap-up` → `main`; README and this TODO brought to the new state | all | the gates written up here, and `main` carries GD |
+
+**Deliberately after the five days** — each is research-sized and would be
+rushed: the discourse graph with typed edges, and the uptake and novelty
+scoring built on it (FR-14.14, the rest of FR-14.15); missed-entry moments
+with audio playback (FR-14.17); speculative pre-generation (FR-14.8); hybrid
+human + AI rooms (the rest of FR-14.1); case, for/against and fishbowl formats
+(FR-14.2); the Spearman study against human moderators (AC-14.7).
+
+**Target:** about 69% of the 21 requirements by Wed 21 Oct (33% today) if every
+day lands — 11 met, 7 partly, the 3 above deferred — with all five release
+gates checked.
+
+### 2026-10-17 — the first real run: what it took, and what broke
+
+Run on this machine in GD's no-Docker mode, with the platform's Groq key and
+Edge voices (recipe below).
+
+- ✅ The suite: **353 passed** (the README says 301); ruff and tsc clean; `next
+  build` succeeds. Python 3.12 works (ruff targets 3.13).
+- ✅ With fixes 1–2 below, a real two-minute practice against three personas:
+  five persona lines with Edge audio, replies **1.2–1.4 s** after the student
+  stops (0.6 s of it a deliberate "hear them out" hold), and a barge-in drops
+  the line it cuts into.
+
+**Blockers found by running it:**
+
+1. 🟡 **The personas are silent on today's models.** The platform's keys serve
+   only `openai/gpt-oss-120b`, `gpt-oss-20b` and `qwen/qwen3.8-27b` — the llama
+   models are gone (see `ai_core.models.RETIRED`). gpt-oss spends the persona
+   line's 150-token cap on hidden reasoning, and Groq answers
+   `json_validate_failed`, every turn. Fix: `reasoning_effort=low` for gpt-oss
+   (`LLM_REASONING_EFFORT`) — a line in **0.5–0.7 s**. In the local clone, not
+   committed yet (Day 1).
+2. 🟡 **Every evaluator fails.** On the final round gpt-oss delivers its answer
+   as a call to a tool named `json`, and Groq rejects it (`tool_use_failed`).
+   Fix: retry that round with `tool_choice="none"` — 4/4 in isolation. Local,
+   not committed yet (Day 1).
+3. ⬜ **The database locks while a report is made.** An evaluation runs inside
+   one SQLite write transaction for its whole length — minutes on the free
+   tier — so the job row stays invisible (`GET …/evaluation` answers 404) and
+   every other write fails: registration 500s. The Observer also calls the LLM
+   inside a write transaction.
+4. ⬜ **Free-tier rate limits.** Five evaluators fire at once, all get 429, all
+   sleep ~20 s together. Measured per key, per model: **8,000 tokens/min and
+   1,000 requests/day**.
+5. ⬜ `edge-tts` is in no requirements file, and `.env.example` does not say how
+   to use Groq or Edge voices.
+6. ⬜ The analyst persona invents statistics ("a 2021 NASSCOM study shows
+   companies hire 70% of interns") — its brief demands a number for every
+   point.
+7. ⬜ No persona is told to admit it is an AI (AC-14.5 [GATE], EC-14.14).
+8. ⬜ A silent student's report contradicts itself — "you spoke for 0% of the
+   discussion. Your points landed, but there were fewer of them…" — where
+   EC-14.1 asks for encouragement.
+
+**Keys: one Groq organization per running app.** The two `GROQ_API_KEYS` have
+separate quotas (measured from the rate-limit headers), and Groq applies limits
+per organization, so they are almost certainly two organizations. Groq's
+[Acceptable Use Policy](https://console.groq.com/docs/legal/ai-policy)
+(effective 2025-10-15) forbids use "beyond published parameters, rate limits,
+or use limitations, including by registering multiple accounts or orchestrating
+usage between multiple organizations." So GD gets its headroom the compliant
+way: spread calls across models (each has its own bucket), pace them from the
+remaining-tokens header, and spend fewer tokens. Switching keys because one is
+revoked or down is fine; switching because one ran out is the forbidden part.
+M06 and M13 already rotate the two keys — recorded as a decision in their TODOs.
+
+**How to run it without Docker** (environment only; no `.env` needed):
+`APP_ENV=local`, `DATABASE_URL=sqlite+aiosqlite:///./gd_local.db`,
+`REDIS_URL=disabled`, `STT_PROVIDER=stub`, `TTS_PROVIDER=edge` (and
+`pip install edge-tts`), `LLM_PROVIDER=openai`,
+`OPENAI_BASE_URL=https://api.groq.com/openai/v1`,
+`LLM_MODEL=openai/gpt-oss-120b`, `PERSONA_LLM_MODEL=openai/gpt-oss-20b`,
+`LLM_API_KEY=<one key>`; then `alembic upgrade head`, uvicorn on `:8000`, and
+`npm run build && npm start` in `frontend/`. A client drives practice over
+`/ws/practice/{id}?token=`: `START`, then per turn `UTTERANCE_START`,
+`UTTERANCE_END` and *then* the WAV bytes — in that order.
+
 ### 2026-10-17 — what the team built, audited against this spec
 
 Built by GS Adithya Krishna (2026-10-04 to 10-07) and abhinav (2026-10-10):
@@ -94,10 +185,10 @@ _Nothing scouted for this module yet._
 
 | | |
 |---|---|
-| Status | **Built on branches, to its own design.** `groq-edge-tts` (7 commits, 2026-10-04 → 10-10): backend, frontend and tests; `main` holds the initial commit only. Not on Platform_Core, not in the shell. |
+| Status | **Built on branches, to its own design.** `groq-edge-tts` (7 commits, 2026-10-04 → 10-10): backend, frontend and tests; `main` holds the initial commit only. Not on Platform_Core, not in the shell. On today's Groq models it runs only with two fixes, landing on branch `wrap-up` (Day 1). |
 | Spec | Written, and the source of every row below. |
 | Scope | 21 functional requirements (17 of them P0), 11 acceptance metrics (5 release-blocking), 15 edge cases. |
-| Tests | **301** by its README (offline: in-memory SQLite, stubbed STT and LLM); not run in the 2026-10-17 audit |
+| Tests | **353 passed** on 2026-10-17 (offline: in-memory SQLite, stubbed STT and LLM; the README still says 301) |
 
 The requirement table below was audited against the `groq-edge-tts` branch's
 code on 2026-10-17. The acceptance gates, edge cases and data model below it
