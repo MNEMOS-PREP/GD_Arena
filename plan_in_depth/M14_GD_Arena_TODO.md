@@ -1,8 +1,8 @@
 # M14 — TODO · Group Discussion Arena
 
-> **Completion: 33%** — 2 of 21 functional requirements met, 10 partially. A GD platform exists — built by GS Adithya Krishna and abhinav from 2026-10-04, **on branches** (`groq-edge-tts` holds all of it; `main` has only the initial commit) and to its own design document (`claude/docs/design.md`) rather than this spec. So it meets several requirements by a different route and misses the spec's distinctive ones: the discourse graph, anti-convergence, speculative pre-generation, missed entry moments. It is not yet on Platform_Core or in the shell.
+> **Completion: 43%** — 5 of 21 functional requirements met, 8 partially (Day 2 of the wrap-up, 18 Oct; it was 33% on 17 Oct). A GD platform exists — built by GS Adithya Krishna and abhinav from 2026-10-04, **on branches** (`groq-edge-tts` holds all of it; `main` has only the initial commit) and to its own design document (`claude/docs/design.md`) rather than this spec. So it meets several requirements by a different route and misses the spec's distinctive ones: the discourse graph, anti-convergence, speculative pre-generation, missed entry moments. It is not yet on Platform_Core or in the shell.
 >
-> _Method: `(met + ½ × partial) ÷ total`, counted from the spec, 2026-08-28; audited against the `groq-edge-tts` branch's code on 2026-10-17 (0% → 33%). One measure applied the same way to all nineteen modules so they compare; it counts requirements, not screens or gates._
+> _Method: `(met + ½ × partial) ÷ total`, counted from the spec, 2026-08-28; audited against the `groq-edge-tts` branch's code on 2026-10-17 (0% → 33%); re-counted on `wrap-up` after Day 2, 2026-10-18 (33% → 43%). One measure applied the same way to all nineteen modules so they compare; it counts requirements, not screens or gates._
 
 Task list for taking **M14 — Group Discussion Arena** to 100% of [M14_GD_Arena.md](M14_GD_Arena.md).
 
@@ -30,7 +30,7 @@ suggested from who built each part — adjust them.
 | Day | Goal | Work | Owner (suggested) | Done when |
 |---|---|---|---|---|
 | **1 · Sat 17 Oct** ✅ | It runs on today's keys | Commit the two model fixes with tests (blockers 1–2 below); fix the database lock — LLM work outside write transactions, the job visible the moment it exists, SQLite in WAL mode (3); pace calls from Groq's remaining-tokens header and fall back to the other model instead of sleeping, one organization's key only (4); `edge-tts` in requirements, `.env.example` for Groq and Edge (5) | Ansh | ✅ **Done 17 Oct** (`8edaf70`, `f29b607`, `f5c2f4c` on `wrap-up`): six persona lines, replies 1.1–1.4 s; the report in 75 s (was 6+ min or never), the job visible as RUNNING meanwhile; 17 of 17 sign-ups during it succeeded (were 500s); 13 rate limits each moved to the other model, no lockstep sleeps; 366 tests |
-| **2 · Sun 18 Oct** | A panel that behaves like one | A moderator persona: an opening round that invites the student (EC-14.1), a redirect when one voice dominates (EC-14.2), a closing call (FR-14.3); stances sampled per persona (FR-14.4); an anti-convergence block, and a curveball after three yields (FR-14.5, EC-14.4); a bid scheduler — eagerness × relevance × time since last turn (FR-14.6); personas admit they are AI when asked (AC-14.5, EC-14.14); no invented statistics (6) | Adithya | a scripted session in which every persona speaks, none repeats another, and "are you a bot?" gets an honest answer |
+| **2 · Sun 18 Oct** ✅ | A panel that behaves like one | A moderator persona: an opening round that invites the student (EC-14.1), a redirect when one voice dominates (EC-14.2), a closing call (FR-14.3); stances sampled per persona (FR-14.4); an anti-convergence block, and a curveball after three yields (FR-14.5, EC-14.4); a bid scheduler — eagerness × relevance × time since last turn (FR-14.6); personas admit they are AI when asked (AC-14.5, EC-14.14); no invented statistics (6) | Adithya | ✅ **Done 18 Oct** (`fe22deb`, `ab246fa`, `2dea9f6`, `aa4625d` on `wrap-up`): live, the moderator opened with "Asha, what's your take first?", all three personas spoke, no line repeated another, nothing invented; "are you a bot?" answered honestly 6 of 6 by the model with the turn instruction, guaranteed by a guard; replies 0.9–1.45 s (a barge-in reply had waited 14.6 s — fixed); 0 persona and 0 evaluator failures; 405 tests |
 | **3 · Mon 19 Oct** | What the student sees | Text GD mode — typed turns, same scheduler and scoring (FR-14.19); live speaking-time bars (FR-14.11); a recent-ideas strip (FR-14.13); raise-hand (FR-14.12); a silent student's report that encourages and does not contradict itself (EC-14.1, blocker 8) | abhinav | a whole session typed, bars moving live, and a silent student's report a teacher would sign |
 | **4 · Tue 20 Oct** | Part of the platform | Sign in with the platform session (Platform_Core identity), not a second account; ports 8114 / 5214 and the platform's start script; a "Group discussion" entry in the shell; GD results reach the skill graph as M04 observations; measure barge-in (AC-14.2, ≤ 350 ms) and floor grant → first audio (AC-14.6, ≤ 800 ms) | Ansh | a student signed in on `:5173` opens GD, practises, and their skill graph moves |
 | **5 · Wed 21 Oct** | Proven and merged | Walk the 5 gates and 15 edge cases and write the results here; a two-browser human room on Docker/LiveKit; merge `wrap-up` → `main`; README and this TODO brought to the new state | all | the gates written up here, and `main` carries GD |
@@ -84,10 +84,13 @@ Edge voices (recipe below).
    every model is cooling.
 5. ✅ `edge-tts` is in no requirements file, and `.env.example` does not say how
    to use Groq or Edge voices. Fixed 17 Oct (`8edaf70`).
-6. ⬜ The analyst persona invents statistics ("a 2021 NASSCOM study shows
+6. ✅ The analyst persona invents statistics ("a 2021 NASSCOM study shows
    companies hire 70% of interns") — its brief demands a number for every
-   point.
-7. ⬜ No persona is told to admit it is an AI (AC-14.5 [GATE], EC-14.14).
+   point. Fixed 18 Oct (`fe22deb`): the brief no longer asks for numbers, and every AI
+   participant is told never to invent figures or sources.
+7. ✅ No persona is told to admit it is an AI (AC-14.5 [GATE], EC-14.14). Fixed 18 Oct:
+   the rule alone got an admission 2 times in 5 on Groq; the turn after the question says
+   so (6 in 6), and a guard prefixes one if a reply still omits it.
 8. ⬜ A silent student's report contradicts itself — "you spoke for 0% of the
    discussion. Your points landed, but there were fewer of them…" — where
    EC-14.1 asks for encouragement.
@@ -207,10 +210,10 @@ Spec §4, verbatim; status from the 2026-10-17 audit of `groq-edge-tts`.
 |---|---|---|
 | FR-14.1 | 🟡 Three modes: solo-vs-AI, humans-only, hybrid — solo practice against AI personas and humans-only group rooms exist; no hybrid room (one practice room per student) | P0 |
 | FR-14.2 | 🟡 Formats: topic, case-based, for/against (assigned stance), fishbowl — open-topic GDs only, typed technical / leadership / HR-social / general | P1 |
-| FR-14.3 | 🟡 AI moderator running a phase machine with time control — the phase machine and clock are code (preparation → live → ending → ended; practice timing phases); no AI moderator, though one persona plays a diplomat | P0 |
-| FR-14.4 | 🟡 3–5 AI panelists with sampled divergent stances and private knowledge — personas with distinct briefs and eagerness (the analyst, the devil's advocate, the diplomat …); stances are not sampled and there is no private knowledge | P0 |
-| FR-14.5 | ⬜ Anti-convergence: repetition-similarity block on contributions | P0 |
-| FR-14.6 | 🟡 Floor-control scheduler with a bid model — a weighted pick by eagerness, with chained follow-ons; no bid model | P0 |
+| FR-14.3 | ✅ AI moderator running a phase machine with time control — the coded phase machine and clock, plus a moderator persona (`panel.pick_moderator`) who opens and invites the student, brings a silent student in, redirects a dominant voice and closes (Day 2) | P0 |
+| FR-14.4 | 🟡 3–5 AI panelists with sampled divergent stances and private knowledge — stances sampled per persona, distinct up to three, and a private angle each (Day 2); the "private knowledge" is a lens rather than facts, and a practice panel is 1–4 personas, not 3–5 | P0 |
+| FR-14.5 | ✅ Anti-convergence: repetition-similarity block on contributions — a restated point goes back once, then the persona yields; three yields bring a curveball (Day 2) | P0 |
+| FR-14.6 | ✅ Floor-control scheduler with a bid model — each persona bids eagerness × freshness × disagreement × relevance × floor balance; the highest speaks (Day 2) | P0 |
 | FR-14.7 | 🟡 Human speech always wins the floor; AI yields ≤ 350 ms — the browser's VAD cuts a persona's playback when the student speaks, recorded as an interruption; the 350 ms bound is not measured | P0 |
 | FR-14.8 | ⬜ Speculative pre-generation of the next 2 bidders' contributions | P0 |
 | FR-14.9 | ✅ Multi-human rooms over an SFU, up to 8 participants — LiveKit; `max_participants` defaults to 8 | P0 |
@@ -237,9 +240,9 @@ Spec §13. A **[GATE]** is release-blocking; the rest are tracked.
 |---|---|---|
 | AC-14.1 **[GATE]** | ⬜ Overlap in a 5-participant session | < 4% of wall clock |
 | AC-14.2 **[GATE]** | ⬜ Human barge-in stops AI | ≤ 350 ms |
-| AC-14.3 **[GATE]** | ⬜ AI panel stance divergence (min pairwise) | above threshold, 100% of sessions |
+| AC-14.3 **[GATE]** | 🟡 AI panel stance divergence (min pairwise) — distinct stances up to three personas; a fourth shares a stance, distinct by angle; not yet measured as a pairwise score | above threshold, 100% of sessions |
 | AC-14.4 **[GATE]** | ⬜ No public individual quality ranking | design + UI test |
-| AC-14.5 **[GATE]** | ⬜ AI participants identify as AI when asked | 100% |
+| AC-14.5 **[GATE]** | ✅ AI participants identify as AI when asked — prompt rule + turn instruction (6/6 live) + a guard that guarantees it | 100% |
 | AC-14.6 | ⬜ Floor grant → first audio p95 | ≤ 800 ms |
 | AC-14.7 | ⬜ Contribution metric vs human moderators (Spearman) | ≥ 0.6 |
 | AC-14.8 | ⬜ Improvement over speaking-time baseline | reported (the Paper 5 result) |
@@ -256,10 +259,10 @@ difference between a demo and a product.
 
 | EC | | Expected behaviour |
 |---|---|---|
-| EC-14.1 | ⬜ Student says nothing the entire session | Opening round guarantees ≥1 utterance; debrief focuses entirely on entry moments; **tone must be encouraging, not disappointed** |
-| EC-14.2 | ⬜ Student dominates completely (70% floor) | Moderator intervenes twice with a redirect ("Kavya, what do you think?"); debrief shows uptake data |
+| EC-14.1 | 🟡 Student says nothing the entire session — the moderator invites them by name in the opening and after 40 s of silence (Day 2); the encouraging debrief is Day 3 | Opening round guarantees ≥1 utterance; debrief focuses entirely on entry moments; **tone must be encouraging, not disappointed** |
+| EC-14.2 | ✅ Student dominates completely (70% floor) — the moderator hands the floor to the quietest persona, twice at most (Day 2) | Moderator intervenes twice with a redirect ("Kavya, what do you think?"); debrief shows uptake data |
 | EC-14.3 | ⬜ Two humans always talk over each other | Moderator intervenes; overlap stats surfaced to both |
-| EC-14.4 | ⬜ All AI agents converge despite mitigations | Repetition block forces yields; if 3 consecutive yields, the moderator injects a curveball |
+| EC-14.4 | ✅ All AI agents converge despite mitigations — repetition block forces yields; three in a row bring the moderator's curveball (Day 2) | Repetition block forces yields; if 3 consecutive yields, the moderator injects a curveball |
 | EC-14.5 | ⬜ Human drops mid-session | Seat held 60 s; moderator notes and continues; their partial score is computed |
 | EC-14.6 | ⬜ Only 1 human joins a friends-room | Auto-converts to hybrid with AI fillers, with consent ("nobody else joined — want me to fill the seats?") |
 | EC-14.7 | ⬜ Topic is unfamiliar to everyone | Moderator provides a 20-second framing; unfamiliarity is not penalised |
@@ -269,7 +272,7 @@ difference between a demo and a product.
 | EC-14.11 | ⬜ 8 participants (max) | AI agents drop to 0; scheduler handles humans-only; overlap will be higher and that's realistic |
 | EC-14.12 | ⬜ Network drops for one participant | SFU handles; on return, a 10-second catch-up summary |
 | EC-14.13 | ⬜ Discourse graph pass fails | Fall back to novelty-only scoring; uptake marked unavailable |
-| EC-14.14 | ⬜ Student asks the AI directly "are you a bot?" | Agents answer honestly: "I'm an AI participant." **Never deceive.** |
+| EC-14.14 | ✅ Student asks the AI directly "are you a bot?" — answered honestly, guaranteed (Day 2) | Agents answer honestly: "I'm an AI participant." **Never deceive.** |
 | EC-14.15 | ⬜ Fishbowl observers | Can leave rubric-anchored comments; observers' comments shown only after the session |
 
 ---
