@@ -29,7 +29,7 @@ suggested from who built each part — adjust them.
 
 | Day | Goal | Work | Owner (suggested) | Done when |
 |---|---|---|---|---|
-| **1 · Sat 17 Oct** | It runs on today's keys | Commit the two model fixes with tests (blockers 1–2 below); fix the database lock — LLM work outside write transactions, the job visible the moment it exists, SQLite in WAL mode (3); pace calls from Groq's remaining-tokens header and fall back to the other model instead of sleeping, one organization's key only (4); `edge-tts` in requirements, `.env.example` for Groq and Edge (5) | Ansh | the scripted practice gives persona lines and a report, and nothing 500s while the report is made |
+| **1 · Sat 17 Oct** ✅ | It runs on today's keys | Commit the two model fixes with tests (blockers 1–2 below); fix the database lock — LLM work outside write transactions, the job visible the moment it exists, SQLite in WAL mode (3); pace calls from Groq's remaining-tokens header and fall back to the other model instead of sleeping, one organization's key only (4); `edge-tts` in requirements, `.env.example` for Groq and Edge (5) | Ansh | ✅ **Done 17 Oct** (`8edaf70`, `f29b607`, `f5c2f4c` on `wrap-up`): six persona lines, replies 1.1–1.4 s; the report in 75 s (was 6+ min or never), the job visible as RUNNING meanwhile; 17 of 17 sign-ups during it succeeded (were 500s); 13 rate limits each moved to the other model, no lockstep sleeps; 366 tests |
 | **2 · Sun 18 Oct** | A panel that behaves like one | A moderator persona: an opening round that invites the student (EC-14.1), a redirect when one voice dominates (EC-14.2), a closing call (FR-14.3); stances sampled per persona (FR-14.4); an anti-convergence block, and a curveball after three yields (FR-14.5, EC-14.4); a bid scheduler — eagerness × relevance × time since last turn (FR-14.6); personas admit they are AI when asked (AC-14.5, EC-14.14); no invented statistics (6) | Adithya | a scripted session in which every persona speaks, none repeats another, and "are you a bot?" gets an honest answer |
 | **3 · Mon 19 Oct** | What the student sees | Text GD mode — typed turns, same scheduler and scoring (FR-14.19); live speaking-time bars (FR-14.11); a recent-ideas strip (FR-14.13); raise-hand (FR-14.12); a silent student's report that encourages and does not contradict itself (EC-14.1, blocker 8) | abhinav | a whole session typed, bars moving live, and a silent student's report a teacher would sign |
 | **4 · Tue 20 Oct** | Part of the platform | Sign in with the platform session (Platform_Core identity), not a second account; ports 8114 / 5214 and the platform's start script; a "Group discussion" entry in the shell; GD results reach the skill graph as M04 observations; measure barge-in (AC-14.2, ≤ 350 ms) and floor grant → first audio (AC-14.6, ≤ 800 ms) | Ansh | a student signed in on `:5173` opens GD, practises, and their skill graph moves |
@@ -60,27 +60,30 @@ Edge voices (recipe below).
 
 **Blockers found by running it:**
 
-1. 🟡 **The personas are silent on today's models.** The platform's keys serve
+1. ✅ **The personas are silent on today's models.** The platform's keys serve
    only `openai/gpt-oss-120b`, `gpt-oss-20b` and `qwen/qwen3.8-27b` — the llama
    models are gone (see `ai_core.models.RETIRED`). gpt-oss spends the persona
    line's 150-token cap on hidden reasoning, and Groq answers
    `json_validate_failed`, every turn. Fix: `reasoning_effort=low` for gpt-oss
-   (`LLM_REASONING_EFFORT`) — a line in **0.5–0.7 s**. In the local clone, not
-   committed yet (Day 1).
-2. 🟡 **Every evaluator fails.** On the final round gpt-oss delivers its answer
+   (`LLM_REASONING_EFFORT`) — a line in **0.5–0.7 s**. Fixed 17 Oct (`8edaf70`).
+2. ✅ **Every evaluator fails.** On the final round gpt-oss delivers its answer
    as a call to a tool named `json`, and Groq rejects it (`tool_use_failed`).
-   Fix: retry that round with `tool_choice="none"` — 4/4 in isolation. Local,
-   not committed yet (Day 1).
-3. ⬜ **The database locks while a report is made.** An evaluation runs inside
+   Fix: retry that round with `tool_choice="none"` — 4/4 in isolation. Fixed
+   17 Oct (`8edaf70`).
+3. ✅ **The database locks while a report is made.** An evaluation runs inside
    one SQLite write transaction for its whole length — minutes on the free
    tier — so the job row stays invisible (`GET …/evaluation` answers 404) and
    every other write fails: registration 500s. The Observer also calls the LLM
-   inside a write transaction.
-4. ⬜ **Free-tier rate limits.** Five evaluators fire at once, all get 429, all
+   inside a write transaction. Fixed 17 Oct (`f29b607`): progress committed before
+   each model step, each window committed as it is observed, SQLite in WAL with a
+   30 s busy timeout.
+4. ✅ **Free-tier rate limits.** Five evaluators fire at once, all get 429, all
    sleep ~20 s together. Measured per key, per model: **8,000 tokens/min and
-   1,000 requests/day**.
-5. ⬜ `edge-tts` is in no requirements file, and `.env.example` does not say how
-   to use Groq or Edge voices.
+   1,000 requests/day**. Fixed 17 Oct (`f5c2f4c`): a 429 cools that model for the
+   window Groq names and calls move to `LLM_FALLBACK_MODELS`; they wait only when
+   every model is cooling.
+5. ✅ `edge-tts` is in no requirements file, and `.env.example` does not say how
+   to use Groq or Edge voices. Fixed 17 Oct (`8edaf70`).
 6. ⬜ The analyst persona invents statistics ("a 2021 NASSCOM study shows
    companies hire 70% of interns") — its brief demands a number for every
    point.
