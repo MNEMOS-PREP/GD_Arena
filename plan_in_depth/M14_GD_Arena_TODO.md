@@ -31,7 +31,7 @@ suggested from who built each part — adjust them.
 |---|---|---|---|---|
 | **1 · Sat 17 Oct** ✅ | It runs on today's keys | Commit the two model fixes with tests (blockers 1–2 below); fix the database lock — LLM work outside write transactions, the job visible the moment it exists, SQLite in WAL mode (3); pace calls from Groq's remaining-tokens header and fall back to the other model instead of sleeping, one organization's key only (4); `edge-tts` in requirements, `.env.example` for Groq and Edge (5) | Ansh | ✅ **Done 17 Oct** (`8edaf70`, `f29b607`, `f5c2f4c` on `wrap-up`): six persona lines, replies 1.1–1.4 s; the report in 75 s (was 6+ min or never), the job visible as RUNNING meanwhile; 17 of 17 sign-ups during it succeeded (were 500s); 13 rate limits each moved to the other model, no lockstep sleeps; 366 tests |
 | **2 · Sun 18 Oct** ✅ | A panel that behaves like one | A moderator persona: an opening round that invites the student (EC-14.1), a redirect when one voice dominates (EC-14.2), a closing call (FR-14.3); stances sampled per persona (FR-14.4); an anti-convergence block, and a curveball after three yields (FR-14.5, EC-14.4); a bid scheduler — eagerness × relevance × time since last turn (FR-14.6); personas admit they are AI when asked (AC-14.5, EC-14.14); no invented statistics (6) | Adithya | ✅ **Done 18 Oct** (`fe22deb`, `ab246fa`, `2dea9f6`, `aa4625d` on `wrap-up`): live, the moderator opened with "Asha, what's your take first?", all three personas spoke, no line repeated another, nothing invented; "are you a bot?" answered honestly 6 of 6 by the model with the turn instruction, guaranteed by a guard; replies 0.9–1.45 s (a barge-in reply had waited 14.6 s — fixed); 0 persona and 0 evaluator failures; 405 tests |
-| **3 · Mon 19 Oct** 🟡 | What the student sees | Text GD mode — typed turns, same scheduler and scoring (FR-14.19); live speaking-time bars (FR-14.11); a recent-ideas strip (FR-14.13); raise-hand (FR-14.12); a silent student's report that encourages and does not contradict itself (EC-14.1, blocker 8) | abhinav | 🟡 **Built 18 Oct, a day early** (`6fcd1d1`, `091891d` on `wrap-up`). In a real browser (headless Edge): "Type instead" starts the session live, typed turns are answered, "are you a bot?" typed → "I'm an AI participant…", raise hand → "Asha Rao, please go ahead", the bars move, the ideas strip shows two ideas and an open question, no console errors. Found and fixed on the way: with no preparation the page never learned the discussion had started (composer disabled, microphone deaf). **Left for the morning:** walk a fully silent session's report live (unit-tested only), and re-walk after the last change (a typed turn now holds the floor for its spoken length; unit-tested). 416 tests |
+| **3 · Mon 19 Oct** ✅ | What the student sees | Text GD mode — typed turns, same scheduler and scoring (FR-14.19); live speaking-time bars (FR-14.11); a recent-ideas strip (FR-14.13); raise-hand (FR-14.12); a silent student's report that encourages and does not contradict itself (EC-14.1, blocker 8) | abhinav | 🟡 **Built 18 Oct, a day early** (`6fcd1d1`, `091891d` on `wrap-up`). In a real browser (headless Edge): "Type instead" starts the session live, typed turns are answered, "are you a bot?" typed → "I'm an AI participant…", raise hand → "Asha Rao, please go ahead", the bars move, the ideas strip shows two ideas and an open question, no console errors. Found and fixed on the way: with no preparation the page never learned the discussion had started (composer disabled, microphone deaf). ✅ **Both morning checks done 19 Oct** (`1258678`): a silent student's report is kind all the way through — the narrative is now written without a model (told to be kind, it still opened "you contributed nothing"), and it quotes the real invitation; typed turns re-walked, credited by their spoken length (0:05 for one point, was 0:01). Also: a pending raised hand is cancelled when the student comes in on their own. 421 tests |
 | **4 · Tue 20 Oct** | Part of the platform | Sign in with the platform session (Platform_Core identity), not a second account; ports 8114 / 5214 and the platform's start script; a "Group discussion" entry in the shell; GD results reach the skill graph as M04 observations; measure barge-in (AC-14.2, ≤ 350 ms) and floor grant → first audio (AC-14.6, ≤ 800 ms) | Ansh | a student signed in on `:5173` opens GD, practises, and their skill graph moves |
 | **5 · Wed 21 Oct** | Proven and merged | Walk the 5 gates and 15 edge cases and write the results here; a two-browser human room on Docker/LiveKit; merge `wrap-up` → `main`; README and this TODO brought to the new state | all | the gates written up here, and `main` carries GD |
 
@@ -91,11 +91,11 @@ Edge voices (recipe below).
 7. ✅ No persona is told to admit it is an AI (AC-14.5 [GATE], EC-14.14). Fixed 18 Oct:
    the rule alone got an admission 2 times in 5 on Groq; the turn after the question says
    so (6 in 6), and a guard prefixes one if a reply still omits it.
-8. 🟡 A silent student's report contradicts itself — "you spoke for 0% of the
+8. ✅ A silent student's report contradicts itself — "you spoke for 0% of the
    discussion. Your points landed, but there were fewer of them…" — where
    EC-14.1 asks for encouragement. Fixed 18 Oct in code (`6fcd1d1`): a silent candidate's
-   debrief is the moments someone turned to them by name, kindly worded; unit-tested, the
-   live walk is due on Day 4's morning.
+   debrief is the moments someone turned to them by name, kindly worded; checked live on
+   19 Oct (`1258678`), narrative included.
 
 **Keys: one Groq organization per running app.** The two `GROQ_API_KEYS` have
 separate quotas (measured from the rate-limit headers), and Groq applies limits
@@ -108,6 +108,12 @@ way: spread calls across models (each has its own bucket), pace them from the
 remaining-tokens header, and spend fewer tokens. Switching keys because one is
 revoked or down is fine; switching because one ran out is the forbidden part.
 M06 and M13 already rotate the two keys — recorded as a decision in their TODOs.
+
+**Capacity on the free tier (measured 19 Oct).** One persona line costs ~1.1K tokens on
+Groq; a key allows 8K tokens a minute per model, so ~7 lines a minute on the persona
+model. One live session fits (replies ~1.3 s); a second session, or a report being
+made at the same time, puts both models into cooldown and replies wait 15–25 s. Run
+one live session at a time on the free tier; a paid tier lifts this.
 
 **How to run it without Docker** (environment only; no `.env` needed):
 `APP_ENV=local`, `DATABASE_URL=sqlite+aiosqlite:///./gd_local.db`,
@@ -261,7 +267,7 @@ difference between a demo and a product.
 
 | EC | | Expected behaviour |
 |---|---|---|
-| EC-14.1 | 🟡 Student says nothing the entire session — the moderator invites them by name in the opening and after 40 s of silence (Day 2); the encouraging debrief is Day 3 | Opening round guarantees ≥1 utterance; debrief focuses entirely on entry moments; **tone must be encouraging, not disappointed** |
+| EC-14.1 | ✅ Student says nothing the entire session — the moderator invites them by name in the opening and after 40 s of silence; the debrief is the moments someone turned to them, kindly worded, narrative included (Days 2–3, checked live) | Opening round guarantees ≥1 utterance; debrief focuses entirely on entry moments; **tone must be encouraging, not disappointed** |
 | EC-14.2 | ✅ Student dominates completely (70% floor) — the moderator hands the floor to the quietest persona, twice at most (Day 2) | Moderator intervenes twice with a redirect ("Kavya, what do you think?"); debrief shows uptake data |
 | EC-14.3 | ⬜ Two humans always talk over each other | Moderator intervenes; overlap stats surfaced to both |
 | EC-14.4 | ✅ All AI agents converge despite mitigations — repetition block forces yields; three in a row bring the moderator's curveball (Day 2) | Repetition block forces yields; if 3 consecutive yields, the moderator injects a curveball |
