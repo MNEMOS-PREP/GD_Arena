@@ -1,8 +1,8 @@
 # M14 — TODO · Group Discussion Arena
 
-> **Completion: 67%** — 11 of 21 functional requirements met, 6 partially (after Day 5's walk, 19 Oct; 33% on 17 Oct, 43% after Day 2, 62% after Day 3, 64% after Day 4). Four of the five release gates met, the fifth partly. A GD platform exists — built by GS Adithya Krishna and abhinav from 2026-10-04, **on branches** (`groq-edge-tts` holds all of it; `main` has only the initial commit) and to its own design document (`claude/docs/design.md`) rather than this spec. So it meets several requirements by a different route and misses the spec's distinctive ones: the discourse graph, anti-convergence, speculative pre-generation, missed entry moments. Since Day 4 (19 Oct) it is part of the platform: it signs in with Platform_Core's identity, opens from the shell's menu at `/gd`, and sends its results to the skill graph (M04).
+> **Completion: 86%** — 17 of 21 functional requirements met, 2 partially (19 Oct: abhinav's `m14-to-90` merged and reviewed; 33% on 17 Oct, 43% after Day 2, 62% after Day 3, 64% after Day 4, 67% after Day 5's walk). Four of the five release gates met, the fifth partly. A GD platform exists — built by GS Adithya Krishna and abhinav from 2026-10-04, **on branches** (`groq-edge-tts` holds all of it; `main` has only the initial commit) and to its own design document (`claude/docs/design.md`) rather than this spec. So it meets several requirements by a different route and misses the spec's distinctive ones: the discourse graph, anti-convergence, speculative pre-generation, missed entry moments. Since Day 4 (19 Oct) it is part of the platform: it signs in with Platform_Core's identity, opens from the shell's menu at `/gd`, and sends its results to the skill graph (M04).
 >
-> _Method: `(met + ½ × partial) ÷ total`, counted from the spec, 2026-08-28; audited against the `groq-edge-tts` branch's code on 2026-10-17 (0% → 33%); re-counted on `wrap-up` after Day 2, 2026-10-18 (33% → 43%), after Day 3 the same day (43% → 62%), after Day 4 on 19 Oct (62% → 64%: FR-14.7's 350 ms bound shown), and after Day 5's walk the same day (64% → 67%: FR-14.20's overlap shown in a five-participant session). One measure applied the same way to all nineteen modules so they compare; it counts requirements, not screens or gates._
+> _Method: `(met + ½ × partial) ÷ total`, counted from the spec, 2026-08-28; audited against the `groq-edge-tts` branch's code on 2026-10-17 (0% → 33%); re-counted on `wrap-up` after Day 2, 2026-10-18 (33% → 43%), after Day 3 the same day (43% → 62%), after Day 4 on 19 Oct (62% → 64%: FR-14.7's 350 ms bound shown), and after Day 5's walk the same day (64% → 67%: FR-14.20's overlap shown in a five-participant session), and after abhinav's `m14-to-90` with its review the same evening (67% → 86%: FR-14.4, 14.10, 14.14, 14.15, 14.16, 14.17 met). One measure applied the same way to all nineteen modules so they compare; it counts requirements, not screens or gates._
 
 Task list for taking **M14 — Group Discussion Arena** to 100% of [M14_GD_Arena.md](M14_GD_Arena.md).
 
@@ -47,6 +47,36 @@ human + AI rooms (the rest of FR-14.1); case, for/against and fishbowl formats
 **Target:** about 69% of the 21 requirements by Wed 21 Oct (33% today) if every
 day lands — 11 met, 7 partly, the 3 above deferred — with all five release
 gates checked. **Reached 67% on 19 Oct**, four gates met and AC-14.3 partly.
+
+### 2026-10-19 — abhinav's `m14-to-90`, merged and reviewed
+
+abhinav's `634f502` (PR #1 into `wrap-up`) built six requirements: panels of up to
+five with private knowledge, for/against and case formats, late join, the six
+contribution measures, a domination index, a typed discourse graph, and missed
+openings with replay. 484 tests, ruff and tsc clean. Reviewed by running it;
+kept as built, with these fixed (`53f5976`):
+
+1. ✅ **Hindi scored 0 on novelty.** Words were counted with `[a-z]`, so the same point
+   scored 10 in English and 0 in Hindi, against EC-14.8. Now any script; closure
+   is also read from what a late contribution does, not only English phrases.
+2. ✅ **"Openings you let pass" listed openings that were taken.** A reply after 12 s
+   was "missed" (every typed answer), and "building on Asha's point" counted as an
+   invitation. Now only invitations count, and the next voice decides.
+3. ✅ **For/against told the panel "You argue FOR"** beside a persona's own "You
+   OPPOSE". Now third person.
+4. ✅ **Entry skill gave 10/10 with no invitation.** Now "not measured".
+5. ✅ **Three features were stored but never shown.** Now "How you took part" (the six
+   measures) and "Floor and flow" (domination, how contributions connected, with
+   names). Seen live in headless Edge, no console errors.
+6. ✅ **Line endings rewritten on the report page** (2,105 lines of diff for 67); back to
+   CRLF. The same slip I had made in `service.py` on Day 3, also fixed.
+
+**Found while walking it, older than either, not fixed:** the behaviour evaluator
+wrote "28% in a 6-person discussion, over the 17% even share" for four people
+(its rubric's example misleads it); a raw parser error reaches the host's group
+summary when an evaluator's JSON is malformed; the group narrative says "A" and
+"P1" rather than names. **Cost:** three panelists by default (was two), up to
+five, so each session spends more of the daily allowance.
 
 ### 2026-10-19 — Day 5's walk: what it found
 
@@ -260,22 +290,22 @@ Spec §4, verbatim; status from the 2026-10-17 audit of `groq-edge-tts`.
 | FR | | Priority |
 |---|---|---|
 | FR-14.1 | 🟡 Three modes: solo-vs-AI, humans-only, hybrid — solo practice against AI personas and humans-only group rooms exist; no hybrid room (one practice room per student) | P0 |
-| FR-14.2 | 🟡 Formats: topic, case-based, for/against (assigned stance), fishbowl — open-topic GDs only, typed technical / leadership / HR-social / general | P1 |
+| FR-14.2 | 🟡 Formats: topic, case-based, for/against (assigned stance), fishbowl — open topic, for/against (the student is given a side and the panel splits around it) and case study (the student pastes a short case) (abhinav, 634f502); fishbowl not built | P1 |
 | FR-14.3 | ✅ AI moderator running a phase machine with time control — the coded phase machine and clock, plus a moderator persona (`panel.pick_moderator`) who opens and invites the student, brings a silent student in, redirects a dominant voice and closes (Day 2) | P0 |
-| FR-14.4 | 🟡 3–5 AI panelists with sampled divergent stances and private knowledge — stances sampled per persona, distinct up to three, and a private angle each (Day 2); the "private knowledge" is a lens rather than facts, and a practice panel is 1–4 personas, not 3–5 | P0 |
+| FR-14.4 | ✅ 3–5 AI panelists with sampled divergent stances and private knowledge — panels of up to five (three by default), stances sampled per persona, a private angle each, and private knowledge per angle: reasoning only, never figures (abhinav, 634f502) | P0 |
 | FR-14.5 | ✅ Anti-convergence: repetition-similarity block on contributions — a restated point goes back once, then the persona yields; three yields bring a curveball (Day 2) | P0 |
 | FR-14.6 | ✅ Floor-control scheduler with a bid model — each persona bids eagerness × freshness × disagreement × relevance × floor balance; the highest speaks (Day 2) | P0 |
 | FR-14.7 | ✅ Human speech always wins the floor; AI yields ≤ 350 ms — the browser's VAD cuts a persona's playback when the student speaks, recorded as an interruption; the server stops the line 8–13 ms after the student starts, ~150–230 ms with the browser's detection (Day 4) | P0 |
 | FR-14.8 | ⬜ Speculative pre-generation of the next 2 bidders' contributions | P0 |
 | FR-14.9 | ✅ Multi-human rooms over an SFU, up to 8 participants — LiveKit; `max_participants` defaults to 8 | P0 |
-| FR-14.10 | 🟡 Invite links, lobby, host controls, late join, reconnect — six-character join code, email invites that reserve a seat, a lobby with ready marks, host start and end, reconnect after a drop; late join not found | P0 |
+| FR-14.10 | ✅ Invite links, lobby, host controls, late join, reconnect — six-character join code, email invites that reserve a seat, a lobby with ready marks, host start and end, reconnect after a drop, and late join to a live room for two minutes or half the session (abhinav, 634f502) | P0 |
 | FR-14.11 | ✅ Live speaking-time counters for all participants — bars per participant, in each orb's colour, in the practice and group rooms, from recorded turns (Day 3) | P0 |
 | FR-14.12 | ✅ Optional raise-hand with moderator invitation — the moderator invites the student by name at the next gap (Day 3) | P1 |
 | FR-14.13 | ✅ "Recent ideas" strip — the Observer's latest arguments and open questions, sent to the room when its understanding changes (Day 3) | P1 |
-| FR-14.14 | ⬜ Discourse graph construction with typed edges — the metrics engine builds a who-addressed-whom graph between speakers, not typed edges between contributions | P0 |
-| FR-14.15 | 🟡 Contribution scoring: novelty, uptake, floor dynamics, entry skill, listening, closure — specialist evaluator agents and code-measured turns, interruptions and latency, on its own dimensions rather than these six | P0 |
-| FR-14.16 | 🟡 Domination index separating leading from bulldozing — a floor-share flag (`dominant()`, ≥ 30%) and a rubric that marks dominating-not-directing down; no index | P0 |
-| FR-14.17 | ⬜ Missed-entry-moment detection with audio playback | P1 |
+| FR-14.14 | ✅ Discourse graph construction with typed edges — one node per contribution, an edge to the one it answers, typed answer / challenge / support / extend / new from its wording, no model (abhinav, 634f502); summarised for the host in "Floor and flow" | P0 |
+| FR-14.15 | ✅ Contribution scoring: novelty, uptake, floor dynamics, entry skill, listening, closure — all six counted in code, each with what it was counted from, shown as "How you took part" (abhinav, 634f502; reviewed 53f5976: any script counts, closure read from what a contribution does, entry skill "not measured" with no invitation). Proxies beside the agents' scores; they do not move the overall | P0 |
+| FR-14.16 | ✅ Domination index separating leading from bulldozing — per speaker, from excess floor share, interruptions and how little they build on others; leading vs bulldozing vs balanced in the host's group summary (abhinav, 634f502) | P0 |
+| FR-14.17 | ✅ Missed-entry-moment detection with audio playback — "Openings you let pass" in the debrief, each replayable in the persona's voice (abhinav, 634f502; reviewed 53f5976: only invitations count, and an opening is taken when theirs is the next voice, so a typed reply is not "missed") | P1 |
 | FR-14.18 | ✅ Private individual debriefs; no public quality ranking — each candidate sees only their own report; the host sees the group report; nothing ranks | P0 |
 | FR-14.19 | ✅ Text GD mode with the same scheduler and scoring — typed turns take the spoken path minus speech-to-text, never cut anyone off, and hold the floor for their spoken length (Day 3) | P0 |
 | FR-14.20 | ✅ Overlap < 4% of wall clock in a 5-participant session — shown in a practice session, the student and four AI personas: 0.0% recorded, under 1% counting six barge-ins (Day 5); a room of five humans not walked | P0 |
