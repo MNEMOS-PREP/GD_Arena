@@ -76,7 +76,7 @@ runs other projects' Postgres, Redis and MinIO.
 | PostgreSQL | localhost:5442 |
 | Redis | localhost:6389 |
 | MinIO API / console | http://localhost:9010 / http://localhost:9011 |
-| Prometheus | http://localhost:9090 |
+| Prometheus | inside the compose network only — see it through Grafana |
 | Grafana | http://localhost:8314 |
 
 Every port is GD's own in the platform's `PORTS.txt` (M14: API 8114, web 5214;

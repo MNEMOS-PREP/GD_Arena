@@ -107,7 +107,7 @@ M14's in the platform's `PORTS.txt`; take any new port from there:
 | PostgreSQL | localhost:5442 |
 | Redis (cache + Streams) | localhost:6389 |
 | MinIO API / console | http://localhost:9010 / http://localhost:9011 |
-| Prometheus | http://localhost:9090 |
+| Prometheus | inside the compose network only (no host port) — via Grafana |
 | Grafana | http://localhost:8314 |
 
 Postgres, Redis and MinIO sit one block off their default ports (5432 / 6379 /

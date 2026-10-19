@@ -77,8 +77,8 @@ services:
     image: prom/prometheus:v2.54.1
     container_name: gd-prometheus
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:9090:9090"
+    # No host port: Grafana (8314) reads it over the compose network, and 9090 is
+    # taken by native services on dev machines. PORTS.txt records none for it.
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
