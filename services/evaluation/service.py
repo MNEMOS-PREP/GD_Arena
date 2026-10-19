@@ -54,6 +54,7 @@ from services.evaluation.synthesis import synthesise
 from services.evaluation.tools import TurnRecord
 from services.llm import QuotaExhausted, allowance_back_in
 from services.metrics import service as metrics_service
+from services.metrics.discourse import build_discourse_graph
 from services.notifications.models import NotificationKind
 from services.notifications.service import notify
 from services.observer import service as observer_service
@@ -432,6 +433,7 @@ async def run_job(session: AsyncSession, job: EvaluationJob) -> EvaluationJob:
             metrics=metrics.per_candidate[label],
             synthesis=syntheses[label].to_dict() if label in syntheses else {},
             moments=entry_moments(segments, label, names.get(label, label), speaker_names),
+            segments=segments,
         )
         await repo.add_report(
             session,
@@ -446,6 +448,7 @@ async def run_job(session: AsyncSession, job: EvaluationJob) -> EvaluationJob:
 
     group = build_group_report(str(gd.id), gd.topic, scores, metrics, state)
     body = group.to_dict()
+    body["discourse_graph"] = build_discourse_graph(segments, set(metrics.per_candidate))
     # The group report agent writes the narrative; every figure in `body` stays computed.
     narrative = await synthesise_group(gd.topic, scores, names, metrics, state, syntheses)
     if narrative:

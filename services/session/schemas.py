@@ -29,7 +29,7 @@ class SessionCreate(BaseModel):
     recording_enabled: bool = False
     rubric_weights: dict[str, float] | None = None
     mode: Literal["group", "solo"] = "group"
-    personas: list[dict] = Field(default_factory=list, max_length=4)
+    personas: list[dict] = Field(default_factory=list, max_length=5)
 
     @model_validator(mode="after")
     def check_capacity(self) -> "SessionCreate":

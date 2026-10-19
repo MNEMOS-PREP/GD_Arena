@@ -82,6 +82,40 @@ class SessionMetrics:
             key=lambda c: -self.per_candidate[c].participation_ratio,
         )
 
+    def domination(self) -> dict[str, dict]:
+        """Per-candidate domination index, separating leading from bulldozing (FR-14.16).
+
+        Holding the floor is not the fault; taking it from others is. So the index
+        blends how far a candidate is over their fair share of talk with how often
+        they cut in and how little they build on others (a response, a question, or
+        support for a point). A big talker who builds on others is "leading"; one who
+        interrupts and ignores others is "bulldozing". All of it is counted in code.
+        """
+        count = max(len(self.per_candidate), 1)
+        fair = 1.0 / count
+        result: dict[str, dict] = {}
+        for label, m in self.per_candidate.items():
+            turns = max(m.turns, 1)
+            excess = max(0.0, (m.participation_ratio - fair) / (1.0 - fair)) if count > 1 else 0.0
+            interrupt_rate = min(1.0, m.interruptions / turns)
+            uptake = min(1.0, (m.responses + m.questions + m.arguments_supported) / turns)
+            index = round(0.5 * excess + 0.3 * interrupt_rate + 0.2 * (1.0 - uptake), 4)
+            holds_floor = m.participation_ratio > max(0.30, 1.5 * fair)
+            if holds_floor and (interrupt_rate >= 0.25 or uptake < 0.3):
+                kind = "bulldozing"
+            elif holds_floor:
+                kind = "leading"
+            else:
+                kind = "balanced"
+            result[label] = {
+                "index": index,
+                "kind": kind,
+                "floor_share": round(m.participation_ratio, 4),
+                "interrupt_rate": round(interrupt_rate, 4),
+                "uptake": round(uptake, 4),
+            }
+        return result
+
     def under_participating(self, threshold: float = 0.10) -> list[str]:
         return sorted(
             (c for c, m in self.per_candidate.items() if m.participation_ratio < threshold),

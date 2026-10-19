@@ -160,6 +160,45 @@ def test_dominant_and_under_participating_are_derived_from_share():
     assert metrics.under_participating(0.10) == ["C"]
 
 
+def test_domination_index_separates_leading_from_bulldozing():
+    """FR-14.16: same floor share, different behaviour, different verdict."""
+    # A holds 70% of the floor and answers B and C; B and C each speak once.
+    leading = compute_metrics(
+        SESSION,
+        [
+            span("B", 0, 10),
+            span("A", 12, 40),
+            span("C", 42, 50),
+            span("A", 52, 94),
+            span("B", 96, 100),
+        ],
+        [seg("A", 12, 40, "Good point, B. What about cost?"), seg("A", 52, 94, "I agree, C.")],
+        ["A", "B", "C"],
+    )
+    # A holds the same floor but cuts across B and C and answers nobody.
+    bulldozing = compute_metrics(
+        SESSION,
+        [
+            span("A", 0, 30),
+            span("B", 20, 24),
+            span("A", 40, 80),
+            span("C", 70, 74),
+            span("A", 90, 100),
+        ],
+        [
+            seg("A", 0, 30, "Here is my view."),
+            seg("A", 40, 80, "My view again."),
+            seg("A", 90, 100, "Mine."),
+        ],
+        ["A", "B", "C"],
+    )
+    good, bad = leading.domination()["A"], bulldozing.domination()["A"]
+    assert good["kind"] == "leading"
+    assert bad["kind"] == "bulldozing"
+    assert bad["index"] > good["index"]
+    assert leading.domination()["B"]["kind"] == "balanced"
+
+
 def test_metrics_are_reproducible():
     """Same input, same numbers — the point of computing them in code."""
     spans = [span("A", 0, 12), span("B", 11, 20), span("A", 25, 30)]

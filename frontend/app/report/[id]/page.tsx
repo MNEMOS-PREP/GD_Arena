@@ -15,11 +15,12 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Icon } from "@/app/icons";
 import { AnimatedBar, ScoreRing, Skeleton } from "@/app/motion";
-import { ApiError, evaluation, sessions } from "@/lib/api";
+import { ApiError, evaluation, momentReplay, sessions } from "@/lib/api";
 import { TranscriptCard } from "@/app/transcript-card";
 import { useAuth } from "@/lib/auth-context";
 import type {
   CandidateReportBody,
+  EntryMoment,
   SynthesisBody,
   EvaluationStatus,
   GDSession,
@@ -365,7 +366,9 @@ function CandidateReportCard({
       )}
 
       <div key={tab} className="tab-panel">
-        {tab === "summary" && <SummaryTab body={body} synthesis={synthesis} />}
+        {tab === "summary" && (
+          <SummaryTab body={body} synthesis={synthesis} sessionId={session.id} canReplay={session.mode === "solo"} />
+        )}
         {tab === "analysis" && (
           <AnalysisTab body={body} session={session} synthesis={synthesis} status={status} />
         )}
@@ -378,12 +381,72 @@ function CandidateReportCard({
   );
 }
 
+function MissedEntries({
+  body,
+  sessionId,
+  canReplay,
+}: {
+  body: CandidateReportBody;
+  sessionId: string;
+  canReplay: boolean;
+}) {
+  const [busy, setBusy] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const missed = (body.entry_moments ?? []).filter((m) => m.missed);
+  if (missed.length === 0) return null;
+
+  async function play(moment: EntryMoment) {
+    setBusy(moment.seconds);
+    setError(null);
+    try {
+      const replay = await momentReplay(sessionId, moment.seconds);
+      if (replay.kind === "audio") {
+        await new Audio(replay.url).play();
+      } else if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(replay.text));
+      }
+    } catch {
+      setError("Could not play that moment.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="narrative">
+      <h3 className="report-section">Openings you let pass</h3>
+      <ul>
+        {missed.map((m) => (
+          <li key={m.seconds}>
+            At {m.timestamp}, {m.speaker}: &ldquo;{m.quote}&rdquo;{" "}
+            {canReplay && (
+              <button
+                type="button"
+                className="arena-btn"
+                disabled={busy !== null}
+                onClick={() => play(m)}
+              >
+                {busy === m.seconds ? "Playing…" : "Play"}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {error && <p className="meta">{error}</p>}
+    </section>
+  );
+}
+
 function SummaryTab({
   body,
   synthesis,
+  sessionId,
+  canReplay,
 }: {
   body: CandidateReportBody;
   synthesis: Partial<SynthesisBody> | null;
+  sessionId: string;
+  canReplay: boolean;
 }) {
   return (
     <>
@@ -440,6 +503,8 @@ function SummaryTab({
           )}
         </div>
       </div>
+
+      <MissedEntries body={body} sessionId={sessionId} canReplay={canReplay} />
 
       {synthesis?.summary && (
         <section className="narrative">

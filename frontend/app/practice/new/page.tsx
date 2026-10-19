@@ -9,15 +9,18 @@ import { ApiError, practice } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { PersonaPreset } from "@/lib/types";
 
-const MAX_PERSONAS = 4;
+const MAX_PERSONAS = 5;
 
 export default function NewPracticePage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const [presets, setPresets] = useState<PersonaPreset[]>([]);
   const [voice, setVoice] = useState<"elevenlabs" | "browser">("browser");
-  const [chosen, setChosen] = useState<string[]>(["arjun", "bhavana"]);
+  const [chosen, setChosen] = useState<string[]>(["arjun", "bhavana", "chitra"]);
   const [topic, setTopic] = useState("");
+  const [format, setFormat] = useState<"open" | "for_against" | "case">("open");
+  const [side, setSide] = useState<"for" | "against">("for");
+  const [caseBrief, setCaseBrief] = useState("");
   const [minutes, setMinutes] = useState(5);
   const [difficulty, setDifficulty] = useState("intermediate");
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +61,9 @@ export default function NewPracticePage() {
         duration_seconds: minutes * 60,
         preparation_seconds: 20,
         personas: chosen.map((preset) => ({ preset })),
+        format,
+        ...(format === "for_against" ? { student_side: side } : {}),
+        ...(format === "case" ? { case_brief: caseBrief } : {}),
       });
       router.push(`/practice/${created.id}`);
     } catch (err) {
@@ -90,6 +96,50 @@ export default function NewPracticePage() {
             required
           />
         </div>
+
+        <div className="grid">
+          <div className="field">
+            <label htmlFor="format">Format</label>
+            <Select<"open" | "for_against" | "case">
+              id="format"
+              value={format}
+              onChange={setFormat}
+              options={[
+                { value: "open", label: "Open topic" },
+                { value: "for_against", label: "For / against" },
+                { value: "case", label: "Case study" },
+              ]}
+            />
+          </div>
+          {format === "for_against" && (
+            <div className="field">
+              <label htmlFor="side">Your side</label>
+              <Select<"for" | "against">
+                id="side"
+                value={side}
+                onChange={setSide}
+                options={[
+                  { value: "for", label: "For the motion" },
+                  { value: "against", label: "Against the motion" },
+                ]}
+              />
+            </div>
+          )}
+        </div>
+
+        {format === "case" && (
+          <div className="field">
+            <label htmlFor="case">The case</label>
+            <textarea
+              id="case"
+              value={caseBrief}
+              onChange={(e) => setCaseBrief(e.target.value)}
+              placeholder="A 40-person firm loses its biggest client after a missed deadline…"
+              minLength={20}
+              required
+            />
+          </div>
+        )}
 
         <div>
           <label>

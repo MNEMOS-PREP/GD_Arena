@@ -267,3 +267,56 @@ async def test_evaluation_cannot_be_requested_for_a_live_session(session_factory
         await session_service.start_session(db, gd)
         with pytest.raises(ConflictError):
             await eval_service.request_evaluation(db, gd)
+
+
+# --------------------------------------------------------------------------
+# Late join (M14 FR-14.10)
+# --------------------------------------------------------------------------
+
+
+async def _third_candidate(client: AsyncClient) -> dict:
+    user = {
+        "email": "latecomer@example.com",
+        "full_name": "Late Comer",
+        "password": "correct-horse-battery",
+    }
+    await client.post("/api/v1/auth/register", json=user)
+    login = await client.post(
+        "/api/v1/auth/login", json={"email": user["email"], "password": user["password"]}
+    )
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+async def test_a_live_room_takes_a_late_joiner_inside_the_window(
+    session_factory, client: AsyncClient, gd_session, ready_session, events
+):
+    async with session_factory() as db:
+        gd = await session_repo.get_session_by_id(db, ready_session)
+        await session_service.start_session(db, gd)
+        await db.commit()
+        assert SessionState(gd.state) is SessionState.LIVE
+
+    late = await _third_candidate(client)
+    response = await client.post(
+        "/api/v1/lobbies/join", json={"code": gd_session["code"]}, headers=late
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["occupancy"] == 3
+    assert events.count("participant.joined") >= 1
+
+
+async def test_a_live_room_refuses_a_joiner_after_the_window(
+    session_factory, client: AsyncClient, gd_session, ready_session
+):
+    async with session_factory() as db:
+        gd = await session_repo.get_session_by_id(db, ready_session)
+        await session_service.start_session(db, gd)
+        gd.started_at = utcnow() - timedelta(seconds=session_service.LATE_JOIN_SECONDS + 30)
+        await db.commit()
+
+    late = await _third_candidate(client)
+    response = await client.post(
+        "/api/v1/lobbies/join", json={"code": gd_session["code"]}, headers=late
+    )
+    assert response.status_code == 409
+    assert "too long ago" in response.text

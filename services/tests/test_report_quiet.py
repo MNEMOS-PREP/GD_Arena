@@ -107,3 +107,19 @@ async def test_a_silent_candidates_narrative_is_kind_and_names_the_first_opening
     assert "The first came at 0:04" in result.summary
     for phrase in ("contributed nothing", "failed", "bottom", "very low"):
         assert phrase not in result.summary.lower()
+
+
+def test_a_missed_entry_is_one_where_the_floor_moved_on():
+    """FR-14.17: Asha missed Chitra's 0:04 opening but took Bhavana's at 1:15."""
+    moments = entry_moments(SEGMENTS, "A", "Asha Rao", NAMES)
+    assert [(m["timestamp"], m["missed"]) for m in moments] == [("0:04", True), ("1:15", False)]
+
+
+def test_an_active_candidate_is_told_about_the_entry_they_missed():
+    moments = entry_moments(SEGMENTS, "A", "Asha Rao", NAMES)
+    report = build_candidate_report(
+        "A", "Asha Rao", _score(), [], _metrics(3, 0.3), moments=moments
+    )
+    joined = " ".join(report.weaknesses)
+    assert "1 time someone turned to you and the floor moved on" in joined
+    assert "At 0:04, Chitra said" in joined

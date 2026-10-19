@@ -206,3 +206,91 @@ async def test_a_new_burst_never_starts_over_a_live_line(
     room.speaking = "P1"  # a persona is mid-line
     room._start_burst()
     assert room.burst is None  # refused: one voice at a time
+
+
+# --- FR-14.17: replaying a missed moment ----------------------------------------
+
+
+class _AudioTTS:
+    name = "fake"
+    mp3_bytes_per_second = 16_000
+    produces_audio = True
+
+    async def stream(self, text: str, voice_id: str):
+        yield b"ID3"
+        yield text.encode()
+
+
+async def _seed_line(session_factory, session_id, label: str, start: float, text: str) -> None:
+    from services.speech import repository as speech_repo
+    from services.speech.models import TranscriptSegmentRow
+
+    async with session_factory() as db:
+        await speech_repo.add_segment(
+            db,
+            TranscriptSegmentRow(
+                session_id=uuid.UUID(session_id),
+                candidate_label=label,
+                start=start,
+                end=start + 5,
+                text=text,
+                confidence=0.9,
+            ),
+        )
+        await db.commit()
+
+
+async def test_a_panel_line_can_be_replayed_in_its_speakers_voice(
+    client: AsyncClient, candidate_auth: dict, second_candidate: dict, session_factory
+):
+    created = await client.post("/api/v1/practice", json=PRACTICE, headers=candidate_auth)
+    sid = created.json()["id"]
+    await _seed_line(session_factory, sid, "P1", 4.0, "Asha, what is your take first?")
+    await _seed_line(session_factory, sid, "A", 9.0, "I think so.")
+
+    set_tts_provider(_AudioTTS())
+    try:
+        ok = await client.get(
+            f"/api/v1/practice/{sid}/moment-audio", params={"seconds": 4.2}, headers=candidate_auth
+        )
+        assert ok.status_code == 200
+        assert ok.headers["content-type"] == "audio/mpeg"
+        assert b"Asha, what is your take first?" in ok.content
+
+        # the student's own line is never synthesised
+        own = await client.get(
+            f"/api/v1/practice/{sid}/moment-audio", params={"seconds": 9.0}, headers=candidate_auth
+        )
+        assert own.status_code == 404
+        # nothing was said then
+        none = await client.get(
+            f"/api/v1/practice/{sid}/moment-audio", params={"seconds": 50}, headers=candidate_auth
+        )
+        assert none.status_code == 404
+        # someone else's session
+        other = await client.get(
+            f"/api/v1/practice/{sid}/moment-audio",
+            params={"seconds": 4.0},
+            headers=second_candidate,
+        )
+        assert other.status_code == 404
+    finally:
+        set_tts_provider(StubTTS())
+
+
+async def test_with_no_voice_service_the_replay_returns_text_for_the_browser(
+    client: AsyncClient, candidate_auth: dict, session_factory
+):
+    created = await client.post("/api/v1/practice", json=PRACTICE, headers=candidate_auth)
+    sid = created.json()["id"]
+    await _seed_line(session_factory, sid, "P2", 12.0, "Do you agree with Arjun?")
+    set_tts_provider(StubTTS())
+    response = await client.get(
+        f"/api/v1/practice/{sid}/moment-audio", params={"seconds": 12}, headers=candidate_auth
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "text": "Do you agree with Arjun?",
+        "speaker": "Bhavana",
+        "audio": False,
+    }

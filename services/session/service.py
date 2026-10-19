@@ -57,6 +57,9 @@ PHASE_DISCUSSION = "discussion"
 PHASE_WAITING = "waiting"
 PHASE_ENDED = "ended"
 
+# FR-14.10: how long after the start a live room still accepts a late joiner.
+LATE_JOIN_SECONDS = 120
+
 # "02:00 → Warning" in the FR-10 example.
 WARNING_THRESHOLD_SECONDS = 120
 
@@ -246,7 +249,12 @@ async def join_by_code(
         return gd, existing
 
     state = SessionState(gd.state)
-    if state not in {SessionState.WAITING, SessionState.READY}:
+    if state is SessionState.LIVE:
+        # FR-14.10 late join: a live room still takes people for a short window, so a
+        # delayed student is not locked out, but not so late they would miss the point.
+        if _elapsed(gd.started_at) > min(LATE_JOIN_SECONDS, gd.duration_seconds / 2):
+            raise ConflictError("this discussion started too long ago to join")
+    elif state not in {SessionState.WAITING, SessionState.READY}:
         raise ConflictError(f"this session is not accepting participants (state {state})")
     if gd.mode == "solo":
         raise ConflictError("this is a private practice session")

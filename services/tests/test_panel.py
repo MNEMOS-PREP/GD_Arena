@@ -558,3 +558,87 @@ async def test_speaking_after_raising_a_hand_cancels_the_invitation(
     await asyncio.wait_for(room.burst, timeout=10)
     assert (room.moderator, "hand") not in calls
     await room.close()
+
+
+def test_a_panel_of_five_gets_distinct_angles_and_private_knowledge():
+    """FR-14.4: 3-5 panelists, each with an angle and something private to bring."""
+    import random
+
+    from services.practice.personas import resolve_personas
+
+    rows = resolve_personas(
+        [{"preset": key} for key in ("arjun", "bhavana", "chitra", "dev", "esha")],
+        random.Random(7),
+    )
+    assert len(rows) == 5
+    assert len({row["angle"] for row in rows}) == 5
+    assert len({row["stance"] for row in rows}) == 3
+    for row in rows:
+        text = panel.persona_system(
+            row,
+            student="Asha",
+            others="the panel",
+            topic="Remote work",
+            max_words=40,
+            clock_guidance="",
+            is_moderator=False,
+        )
+        assert "What you know that others may not bring up" in text
+        assert "statistic" in text  # told to reason, never to quote figures
+
+
+def test_for_against_splits_the_panel_around_the_students_side():
+    """FR-14.2: plainly for or against, with someone always facing the student."""
+    for count in (1, 2, 3, 4, 5):
+        for side, opposing in (("for", "oppose"), ("against", "support")):
+            stances = panel.assign_sides(count, side, random.Random(count))
+            assert len(stances) == count
+            assert set(stances) <= {"support", "oppose"}
+            assert stances.count(opposing) == (count + 1) // 2
+
+
+async def test_for_against_and_case_formats_shape_the_room(client: AsyncClient, candidate_auth):
+    base = {
+        "duration_seconds": 300,
+        "preparation_seconds": 0,
+        "personas": [{"preset": "arjun"}, {"preset": "bhavana"}, {"preset": "chitra"}],
+    }
+
+    fa = await client.post(
+        "/api/v1/practice",
+        json={
+            **base,
+            "topic": "Should remote work be the default?",
+            "format": "for_against",
+            "student_side": "for",
+        },
+        headers=candidate_auth,
+    )
+    assert fa.status_code == 201, fa.text
+    assert fa.json()["topic"].endswith("(You argue FOR the motion.)")
+
+    case = await client.post(
+        "/api/v1/practice",
+        json={
+            **base,
+            "topic": "What should the company do?",
+            "format": "case",
+            "case_brief": "A 40-person firm loses a client after a missed deadline.",
+        },
+        headers=candidate_auth,
+    )
+    # one live practice per student: the second create may be refused for that reason
+    assert case.status_code in (201, 409), case.text
+
+    missing_side = await client.post(
+        "/api/v1/practice",
+        json={**base, "topic": "Should remote work be the default?", "format": "for_against"},
+        headers=candidate_auth,
+    )
+    assert missing_side.status_code == 422
+    thin_case = await client.post(
+        "/api/v1/practice",
+        json={**base, "topic": "What should the company do?", "format": "case", "case_brief": "x"},
+        headers=candidate_auth,
+    )
+    assert thin_case.status_code == 422
