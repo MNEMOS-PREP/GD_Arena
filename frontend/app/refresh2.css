@@ -973,13 +973,6 @@ button svg,
   text-decoration: none;
 }
 
-.top {
-  display: inline-flex;
-  margin-left: 0.4rem;
-  color: #c98a12;
-  vertical-align: middle;
-}
-
 .score-pill {
   display: inline-grid;
   place-items: center;

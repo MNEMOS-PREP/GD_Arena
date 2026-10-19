@@ -103,6 +103,21 @@ def test_the_system_prompt_guards_against_relative_grading():
     assert "speaking the most is not leadership" in prompt
 
 
+@pytest.mark.parametrize("agent", [CONTENT, LEADERSHIP], ids=lambda a: a.name)
+def test_no_evaluator_marks_down_hindi_or_a_mix_of_languages(agent):
+    """EC-14.8: scored on content, never on language (Day 5)."""
+    prompt = agent.system_prompt()
+    assert "Hindi or a mix" in prompt and "Never" in prompt and "accent" in prompt
+
+
+def test_insults_are_disruptive_conduct_whatever_the_timing_says():
+    """Day 5: an abusive student's report praised their "respectful etiquette"."""
+    from services.evaluation.agents.definitions import BEHAVIOR
+
+    prompt = BEHAVIOR.system_prompt()
+    assert "insulting" in prompt and "Never call such a candidate respectful" in prompt
+
+
 # --------------------------------------------------------------------------
 # Batched response validation
 # --------------------------------------------------------------------------

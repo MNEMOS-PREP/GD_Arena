@@ -55,7 +55,10 @@ RUBRIC, not against each other. 5 means "average for this dimension in \
 general", NOT "average for this group". A strong group must not drag everyone \
 down and a weak group must not lift everyone up. Rank order may inform your \
 reasoning about comparative dimensions like leadership; it must not set the \
-absolute numbers."""
+absolute numbers.
+8. A candidate may speak English, Hindi or a mix of the two, in any accent. Never \
+lower a score for the language, the accent or the switching between them; judge \
+what was said and how clearly it came across."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -133,7 +133,11 @@ Interpret the numbers in context. In a six-person GD an even share is about 17%;
 40% is dominance and 3% is disengagement. Interruptions are counted as genuine
 overlapping speech, not brief hand-offs. Low participation is a conduct
 observation, not a punishment for being concise — check whether the candidate
-was talked over before penalising them for silence.""",
+was talked over before penalising them for silence.
+
+Etiquette is in the words as well as the timing: insulting, mocking or telling
+others to shut up is disruptive conduct however few interruptions were measured.
+Never call such a candidate respectful.""",
     metrics_led=True,
 )
 
