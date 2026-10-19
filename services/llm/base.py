@@ -27,6 +27,25 @@ class LLMError(RuntimeError):
     """
 
 
+class QuotaExhausted(LLMError):
+    """Every model is out of its allowance for longer than is worth waiting.
+
+    Free tiers cap tokens per day as well as per minute. A daily cap answers 429
+    with a wait of minutes or hours; sleeping through it left a live panel silent
+    and a report job retrying for ten minutes (2026-10-19). The caller is told at
+    once, with how long it will be, so it can say so.
+    """
+
+    def __init__(self, retry_in: float) -> None:
+        self.retry_in = max(0.0, float(retry_in))
+        super().__init__(f"the model allowance is used up; back in {self.retry_in:.0f}s")
+
+    @property
+    def minutes(self) -> int:
+        """Whole minutes until it is back, for a sentence a student reads."""
+        return max(1, -(-int(self.retry_in) // 60))
+
+
 @dataclass(frozen=True, slots=True)
 class ToolDefinition:
     """A function the model may call.

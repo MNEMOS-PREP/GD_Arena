@@ -281,6 +281,116 @@ async def test_the_report_carries_a_synthesis_narrative(
     assert "overall_score" not in synthesis
 
 
+async def test_a_report_held_up_by_the_model_allowance_waits_then_runs_by_itself(
+    session_factory, client: AsyncClient, evaluated, host_auth, monkeypatch
+):
+    """Day 5: at Groq's daily cap every agent failed and the report never came.
+
+    The job now says why, in words a student reads, and the worker runs it again
+    once the allowance is due back.
+    """
+    from datetime import timedelta
+
+    from services.common.timeutil import utcnow
+    from services.evaluation import queue, worker
+    from services.evaluation import repository as eval_repo
+    from services.evaluation import service as eval_service
+    from services.llm import set_llm_provider
+    from services.llm.stub_provider import StubLLM
+
+    sid = evaluated["id"]
+    url = f"/api/v1/sessions/{sid}/evaluation"
+    await client.post(f"/api/v1/sessions/{sid}/evaluate", headers=host_auth)
+
+    async def unreachable(*args, **kwargs):
+        raise ConnectionError("redis is not running")
+
+    monkeypatch.setattr(queue, "read", unreachable)
+    monkeypatch.setattr(worker, "SessionFactory", session_factory)
+    monkeypatch.setattr(eval_service, "allowance_back_in", lambda: 600.0)
+    set_llm_provider(StubLLM(fail=True))
+    try:
+        assert await worker.drain(session_factory) == 0
+        status = (await client.get(url, headers=host_auth)).json()
+        assert status["state"] == "FAILED" and status["retry_after"]
+        assert "allowance" in status["error"] and "about 10 min" in status["error"]
+
+        async with session_factory() as db:  # not due yet: left alone
+            await worker.sweep(db)
+            await db.commit()
+        assert (await client.get(url, headers=host_auth)).json()["state"] == "FAILED"
+
+        async with session_factory() as db:  # due: queued again, and it runs
+            job = await eval_repo.latest_job(db, uuid.UUID(sid))
+            job.retry_after = utcnow() - timedelta(seconds=1)
+            await db.commit()
+        set_llm_provider(StubLLM())
+        monkeypatch.setattr(eval_service, "allowance_back_in", lambda: None)
+        async with session_factory() as db:
+            await worker.sweep(db)
+            await db.commit()
+        assert await worker.drain(session_factory) == 1
+        status = (await client.get(url, headers=host_auth)).json()
+        assert status["state"] == "COMPLETED" and status["retry_after"] is None
+    finally:
+        set_llm_provider(StubLLM())
+
+
+async def test_a_report_a_restart_cut_off_is_written_again_not_left_running(
+    session_factory, client: AsyncClient, evaluated, host_auth, monkeypatch
+):
+    """Day 5: a restart mid-evaluation left the job RUNNING and the page "analysing"."""
+    from services.evaluation import queue, worker
+    from services.evaluation import repository as eval_repo
+    from services.session.state import EvaluationState
+
+    sid = evaluated["id"]
+    url = f"/api/v1/sessions/{sid}/evaluation"
+    await client.post(f"/api/v1/sessions/{sid}/evaluate", headers=host_auth)
+    async with session_factory() as db:  # the process died here, mid-report
+        job = await eval_repo.latest_job(db, uuid.UUID(sid))
+        job.state = str(EvaluationState.RUNNING)
+        await db.commit()
+
+    assert await worker.recover_interrupted(session_factory) == 1
+    status = (await client.get(url, headers=host_auth)).json()
+    assert status["state"] == "FAILED" and "restarted" in status["error"]
+
+    async def unreachable(*args, **kwargs):
+        raise ConnectionError("redis is not running")
+
+    monkeypatch.setattr(queue, "read", unreachable)
+    async with session_factory() as db:
+        await worker.sweep(db)
+        await db.commit()
+    assert await worker.drain(session_factory) == 1
+    assert (await client.get(url, headers=host_auth)).json()["state"] == "COMPLETED"
+
+
+async def test_any_other_total_failure_is_not_retried_by_itself(
+    session_factory, client: AsyncClient, evaluated, host_auth, monkeypatch
+):
+    from services.evaluation import queue, worker
+    from services.llm import set_llm_provider
+    from services.llm.stub_provider import StubLLM
+
+    sid = evaluated["id"]
+    await client.post(f"/api/v1/sessions/{sid}/evaluate", headers=host_auth)
+
+    async def unreachable(*args, **kwargs):
+        raise ConnectionError("redis is not running")
+
+    monkeypatch.setattr(queue, "read", unreachable)
+    monkeypatch.setattr(worker, "SessionFactory", session_factory)
+    set_llm_provider(StubLLM(fail=True))
+    try:
+        assert await worker.drain(session_factory) == 0
+    finally:
+        set_llm_provider(StubLLM())
+    status = (await client.get(f"/api/v1/sessions/{sid}/evaluation", headers=host_auth)).json()
+    assert status["state"] == "FAILED" and status["retry_after"] is None
+
+
 async def test_without_redis_the_worker_runs_queued_jobs_from_the_database(
     session_factory, client: AsyncClient, evaluated, host_auth, monkeypatch
 ):

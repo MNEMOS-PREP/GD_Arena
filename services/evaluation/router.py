@@ -38,6 +38,8 @@ class EvaluationStatus(BaseModel):
     error: str | None
     queued_at: datetime
     completed_at: datetime | None
+    # Set while a job waits for the model allowance; it runs again by itself then.
+    retry_after: datetime | None = None
 
 
 def _status(job: EvaluationJobRow) -> EvaluationStatus:
@@ -58,6 +60,7 @@ def _status(job: EvaluationJobRow) -> EvaluationStatus:
         error=job.error,
         queued_at=job.queued_at,
         completed_at=job.completed_at,
+        retry_after=job.retry_after,
     )
 
 

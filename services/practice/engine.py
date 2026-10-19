@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from services.ai_platform.bridge import UNNAMED_STUDENT
-from services.llm import LLMError, get_persona_llm_provider
+from services.llm import LLMError, QuotaExhausted, get_persona_llm_provider
 from services.practice import panel
 from services.practice import timing as clock
 from services.realtime.hub import hub
@@ -70,6 +70,8 @@ CUT_LINE_WAIT_STEPS = 50
 # 0.1 s steps) for a persona's line to finish — typing never cuts anyone off.
 MAX_TYPED_CHARS = 600
 TYPED_WAIT_STEPS = 300
+# The panel out of model allowance is said once a minute at most, not per persona.
+QUOTA_NOTICE_SECONDS = 60.0
 # Lines of the discussion each persona prompt carries. A persona line costs ~1.1K
 # tokens on Groq (measured 2026-10-19) against a free tier's 8K tokens a minute
 # per model; ten lines instead of sixteen saves ~15% with no loss of context.
@@ -173,6 +175,7 @@ class PracticeRoom:
         self.rng = random.Random()
         self.last_end = 0.0  # when the latest recorded turn ended
         self.hands = 0  # raised hands (EC-14.10: a distinct entry style)
+        self.quota_told_at = 0.0  # when the student was last told the panel is out
         self._tasks: set[asyncio.Task] = set()  # typed turns in flight
 
     # ------------------------------------------------------------------ setup
@@ -238,6 +241,31 @@ class PracticeRoom:
         gd = self._started_at_gd
         return session_service.elapsed_discussion_seconds(gd) if gd else 0.0
 
+    async def _panel_unavailable(self, exc: QuotaExhausted) -> None:
+        """The model allowance is used up: say so, rather than fall silent.
+
+        At most once a minute, however many personas try to speak meanwhile.
+        """
+        logger.warning("persona turn: allowance used up", extra={"session_id": self.sid})
+        now = time.monotonic()
+        if now - self.quota_told_at < QUOTA_NOTICE_SECONDS:
+            return
+        self.quota_told_at = now
+        await self._send_json(
+            server_frame(
+                ServerEvent.ERROR,
+                self.sid,
+                {
+                    "code": "panel_unavailable",
+                    "message": (
+                        "The AI panel has used up today's allowance and can't speak right now. "
+                        f"It's back in about {exc.minutes} min. Finish now and your report "
+                        "will be written when it's back."
+                    ),
+                },
+            )
+        )
+
     # --------------------------------------------------------- student's turn
 
     async def on_utterance_start(self) -> None:
@@ -290,7 +318,12 @@ class PracticeRoom:
             logger.warning("practice STT failed", extra={"error": str(exc)})
             await self._send_json(
                 server_frame(
-                    ServerEvent.ERROR, self.sid, {"code": "stt_failed", "message": str(exc)}
+                    ServerEvent.ERROR,
+                    self.sid,
+                    {
+                        "code": "stt_failed",
+                        "message": "That didn't come through. Please say it again.",
+                    },
                 )
             )
             return
@@ -642,6 +675,9 @@ class PracticeRoom:
                             self.yields = 0
                             self.forced = (self.moderator, "curveball", "")
                         return False
+        except QuotaExhausted as exc:
+            await self._panel_unavailable(exc)
+            return False
         except LLMError as exc:
             logger.warning("persona turn failed", extra={"session_id": self.sid, "error": str(exc)})
             return False

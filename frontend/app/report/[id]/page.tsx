@@ -102,11 +102,14 @@ export default function ReportPage() {
   // including before the job exists: opened straight from "Finish", the first
   // status call can 404, and polling only on a pending status left the page
   // saying "updates by itself" while it never asked again (19 Oct, Day 4 walk).
+  // A report held up by the model allowance runs again by itself; the page keeps
+  // asking, less often, so it lands here without a reload.
+  const retrying = status?.state === "FAILED" && Boolean(status.retry_after);
   useEffect(() => {
-    if (!pending && !waiting) return;
-    const timer = setInterval(() => void load(), 3000);
+    if (!pending && !waiting && !retrying) return;
+    const timer = setInterval(() => void load(), retrying ? 30000 : 3000);
     return () => clearInterval(timer);
-  }, [pending, waiting, load]);
+  }, [pending, waiting, retrying, load]);
 
   if (!session) return error ? <p className="empty">{error}</p> : <Skeleton rows={3} tall />;
 
@@ -248,7 +251,9 @@ function Completing({ status, session }: { status: EvaluationStatus | null; sess
 
 function EvaluationProgress({ status }: { status: EvaluationStatus }) {
   const done = status.state === "COMPLETED";
-  const failed = status.state === "FAILED";
+  // Held up by the model allowance, not broken: it runs again by itself.
+  const waiting = status.state === "FAILED" && Boolean(status.retry_after);
+  const failed = status.state === "FAILED" && !waiting;
   return (
     <div className="card">
       <div className="row row--between row--wrap">
@@ -259,9 +264,14 @@ function EvaluationProgress({ status }: { status: EvaluationStatus }) {
           </p>
         </div>
         <span className={`pill ${done ? "pill--live" : failed ? "pill--warn" : ""}`}>
-          {status.state.replace(/_/g, " ").toLowerCase()}
+          {waiting ? "waiting" : status.state.replace(/_/g, " ").toLowerCase()}
         </span>
       </div>
+      {waiting && status.error && (
+        <p className="meta" style={{ marginTop: "0.8rem" }}>
+          {status.error}
+        </p>
+      )}
       {failed && status.error && (
         <div className="alert alert--error" style={{ marginTop: "0.8rem" }}>
           {status.error}
@@ -932,8 +942,11 @@ function ParticipantsTable({
   selected: string | null;
 }) {
   const names = new Map(participants.map((p) => [p.candidate_label, p.display_name]));
-  const ranked = [...scores].sort((a, b) => b.overall - a.overall);
-  const dims = Array.from(new Set(ranked.flatMap((s) => Object.keys(s.dimensions))));
+  // Seat order, never best-first, and no "highest score" mark (AC-14.4, the spec's
+  // Trap 6): anyone can host a room of friends, and a sorted table with a trophy
+  // is a leaderboard with the quiet student at the bottom.
+  const seated = [...scores].sort((a, b) => a.candidate_label.localeCompare(b.candidate_label));
+  const dims = Array.from(new Set(seated.flatMap((s) => Object.keys(s.dimensions))));
   return (
     <div className="card">
       <div className="row row--between" style={{ marginBottom: "0.8rem" }}>
@@ -955,7 +968,7 @@ function ParticipantsTable({
             </tr>
           </thead>
           <tbody>
-            {ranked.map((score, index) => {
+            {seated.map((score) => {
               const display = names.get(score.candidate_label) ?? `Candidate ${score.candidate_label}`;
               const isAI = display.endsWith("(AI)");
               return (
@@ -973,11 +986,6 @@ function ParticipantsTable({
                       <span>
                         {display.replace(/\s*\(AI\)$/, "")}
                         {isAI && <span className="badge">AI</span>}
-                        {index === 0 && (
-                          <span className="top" title="Highest overall score">
-                            <Icon name="trophy" size={14} />
-                          </span>
-                        )}
                         {score.needs_human_review && <small className="meta"> needs review</small>}
                       </span>
                     </Link>

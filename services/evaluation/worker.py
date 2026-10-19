@@ -17,6 +17,7 @@ import asyncio
 import logging
 import socket
 import uuid
+from datetime import timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -26,8 +27,9 @@ from services.common.timeutil import as_utc, utcnow
 from services.evaluation import queue, service
 from services.evaluation import repository as repo
 from services.evaluation.models import EvaluationJob
+from services.llm import QuotaExhausted
 from services.session import repository as session_repo
-from services.session.state import EvaluationState, SessionState
+from services.session.state import EvaluationState, SessionState, transition_evaluation
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,19 @@ WORKER_INTERVAL_SECONDS = 5.0
 # How long a job may sit QUEUED before the sweep assumes its queue message was
 # lost and republishes it.
 STALE_JOB_SECONDS = 120.0
+# A job the worker runs again by itself (held up by the model allowance, or cut
+# off by a restart) tries this many times in all, then stays FAILED with its
+# message: a cap that never frees is a configuration fault, not bad luck.
+MAX_AUTOMATIC_ATTEMPTS = 20
+# A job in one of these states when the worker starts was cut off by a restart:
+# one process runs the one worker, so nothing else can be writing it.
+IN_PROGRESS = (
+    EvaluationState.PREPARING,
+    EvaluationState.RUNNING,
+    EvaluationState.WAITING_FOR_AGENT,
+    EvaluationState.AGGREGATING,
+    EvaluationState.REPORT_GENERATING,
+)
 
 CONSUMER_NAME = f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
 
@@ -62,6 +77,30 @@ async def sweep(session: AsyncSession) -> int:
             service.to_contract(job, gd.topic, [p.candidate_label for p in participants])
         )
         logger.info("re-enqueued stale evaluation job", extra={"job_id": str(job.id)})
+
+    # Jobs held up by the model allowance, once it is due back: queued again, and
+    # each attempt that finds it still spent fails fast and waits again.
+    result = await session.execute(
+        select(EvaluationJob).where(
+            EvaluationJob.state == str(EvaluationState.FAILED),
+            EvaluationJob.retry_after.is_not(None),
+        )
+    )
+    for job in result.scalars():
+        if as_utc(job.retry_after) > utcnow() or job.attempts >= MAX_AUTOMATIC_ATTEMPTS:
+            continue
+        gd = await session_repo.get_session_by_id(session, job.session_id)
+        if gd is None:
+            continue
+        job.state = str(transition_evaluation(EvaluationState.FAILED, EvaluationState.QUEUED))
+        job.retry_after = None
+        job.queued_at = utcnow()
+        await session.flush()
+        participants = await session_repo.list_active_participants(session, gd.id)
+        await queue.enqueue(
+            service.to_contract(job, gd.topic, [p.candidate_label for p in participants])
+        )
+        logger.info("evaluation job runs again: allowance due back", extra={"job_id": str(job.id)})
 
     return created
 
@@ -94,6 +133,26 @@ async def _run_job(session: AsyncSession, job: EvaluationJob) -> bool:
         await service.run_job(session, job)
         await session.commit()
         return True
+    except QuotaExhausted as exc:
+        # Not a fault: the model allowance is spent. The job runs again when it is
+        # back, and the student reads why their report is waiting.
+        await session.rollback()
+        async with SessionFactory() as fresh:
+            failed = await repo.get_job(fresh, job_id)
+            if failed is not None:
+                await service.fail_job(
+                    fresh,
+                    failed,
+                    "Today's AI allowance is used up, so your report is waiting. It will "
+                    f"be written by itself in about {exc.minutes} min — this page updates.",
+                    retry_after=utcnow() + timedelta(seconds=exc.retry_in),
+                )
+                await fresh.commit()
+        logger.warning(
+            "evaluation waits for model allowance",
+            extra={"job_id": str(job_id), "retry_in": round(exc.retry_in)},
+        )
+        return False
     except Exception as exc:
         await session.rollback()
         async with SessionFactory() as fresh:
@@ -154,6 +213,31 @@ async def drain_from_database(factory: async_sessionmaker[AsyncSession]) -> int:
     return completed
 
 
+async def recover_interrupted(factory: async_sessionmaker[AsyncSession]) -> int:
+    """Jobs a restart cut off mid-report run again rather than stay RUNNING forever.
+
+    Found on Day 5 (19 Oct): the server restarted during an evaluation and the
+    report page said "analysing" for good. Each is failed with a sentence the
+    student reads, due now, and the next sweep queues it again.
+    """
+    async with factory() as session:
+        result = await session.execute(
+            select(EvaluationJob).where(EvaluationJob.state.in_([str(s) for s in IN_PROGRESS]))
+        )
+        jobs = list(result.scalars())
+        for job in jobs:
+            await service.fail_job(
+                session,
+                job,
+                "The server restarted while your report was being written. It is being "
+                "written again now — this page updates.",
+                retry_after=utcnow(),
+            )
+            logger.warning("evaluation job cut off by a restart", extra={"job_id": str(job.id)})
+        await session.commit()
+    return len(jobs)
+
+
 async def run_worker(
     factory: async_sessionmaker[AsyncSession] | None = None,
     *,
@@ -162,6 +246,10 @@ async def run_worker(
     """Long-running worker loop, started by the app lifespan."""
     factory = factory or SessionFactory
     logger.info("evaluation worker started", extra={"consumer": CONSUMER_NAME})
+    try:
+        await recover_interrupted(factory)
+    except Exception as exc:
+        logger.warning("could not recover interrupted jobs", extra={"error": str(exc)})
     while True:
         try:
             async with factory() as session:

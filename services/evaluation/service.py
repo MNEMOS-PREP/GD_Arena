@@ -17,6 +17,7 @@ import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,6 +52,7 @@ from services.evaluation.report import (
 from services.evaluation.supervisor import run as run_supervisor
 from services.evaluation.synthesis import synthesise
 from services.evaluation.tools import TurnRecord
+from services.llm import QuotaExhausted, allowance_back_in
 from services.metrics import service as metrics_service
 from services.notifications.models import NotificationKind
 from services.notifications.service import notify
@@ -355,6 +357,10 @@ async def run_job(session: AsyncSession, job: EvaluationJob) -> EvaluationJob:
     if outcome.failures:
         await _set_job_state(session, job, EvaluationState.WAITING_FOR_AGENT)
     if not any(outcome.outputs_by_candidate.values()):
+        # Every agent failed because the model allowance is spent: say so, and when
+        # it is back, so the worker can run this job again then (not a bug report).
+        if (back_in := allowance_back_in()) is not None:
+            raise QuotaExhausted(back_in)
         raise RuntimeError(
             f"every evaluator agent failed ({len(outcome.failures)} calls); "
             "job cannot aggregate"
@@ -539,9 +545,16 @@ async def _increment_sessions_completed(session: AsyncSession, user_ids: list) -
     await session.flush()
 
 
-async def fail_job(session: AsyncSession, job: EvaluationJob, error: str) -> EvaluationJob:
-    """Mark a job failed. The session stays EVALUATING so it can be retried."""
+async def fail_job(
+    session: AsyncSession, job: EvaluationJob, error: str, *, retry_after: datetime | None = None
+) -> EvaluationJob:
+    """Mark a job failed. The session stays EVALUATING so it can be retried.
+
+    `retry_after`: the job failed only for want of model allowance, and the
+    worker runs it again from then (`worker.sweep`).
+    """
     job.error = error[:2000]
+    job.retry_after = retry_after
     job.state = str(transition_evaluation(EvaluationState(job.state), EvaluationState.FAILED))
     await session.flush()
     logger.error(

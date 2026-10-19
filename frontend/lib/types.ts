@@ -198,6 +198,8 @@ export interface EvaluationStatus {
   error: string | null;
   queued_at: string;
   completed_at: string | null;
+  /** Set while the report waits for the model allowance; it runs again by itself. */
+  retry_after?: string | null;
 }
 
 export interface EvidenceItem {

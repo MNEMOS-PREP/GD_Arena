@@ -3,7 +3,7 @@
 import logging
 
 from services.common.config import settings
-from services.llm.base import LLMError, LLMProvider, LLMResult
+from services.llm.base import LLMError, LLMProvider, LLMResult, QuotaExhausted
 from services.llm.stub_provider import StubLLM
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,9 @@ __all__ = [
     "LLMError",
     "LLMProvider",
     "LLMResult",
+    "QuotaExhausted",
     "StubLLM",
+    "allowance_back_in",
     "get_llm_provider",
     "get_persona_llm_provider",
     "set_llm_provider",
@@ -46,6 +48,20 @@ def get_llm_provider() -> LLMProvider:
             extra={"provider": _provider.name, "model": _provider.model},
         )
     return _provider
+
+
+
+def allowance_back_in() -> float | None:
+    """Seconds until GD's models have allowance again, when every one of them is
+    out past a busy minute (a daily cap); None while any has headroom, and for a
+    provider with no published caps."""
+    if settings.llm_provider.lower() != "openai":
+        return None
+    from services.llm import openai_provider
+
+    fallbacks = [m.strip() for m in settings.llm_fallback_models.split(",") if m.strip()]
+    models = [m for m in (settings.llm_model, settings.persona_llm_model.strip(), *fallbacks) if m]
+    return openai_provider.allowance_back_in(list(dict.fromkeys(models)))
 
 
 _persona_provider: LLMProvider | None = None

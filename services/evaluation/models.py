@@ -66,6 +66,9 @@ class EvaluationJob(Base):
     selected_agents: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # A job that failed only because the model allowance was used up runs again
+    # by itself from this time (the worker's sweep); None for any other failure.
+    retry_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     queued_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

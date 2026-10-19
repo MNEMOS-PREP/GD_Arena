@@ -305,6 +305,27 @@ def _script(room, *texts):
     return calls
 
 
+async def test_with_the_allowance_spent_the_student_is_told_once_not_left_in_silence(
+    client, candidate_auth, session_factory
+):
+    """Day 5: at Groq's daily cap the panel went silent with no word why."""
+    from services.llm import QuotaExhausted
+
+    room, sent = await _room(client, candidate_auth, session_factory)
+
+    async def spent(*args, **kwargs):
+        raise QuotaExhausted(17 * 60)
+
+    room._generate = spent
+    await room._burst(opening=True)
+    await room._burst(opening=False)
+    notices = [f for f in sent if f.get("type") == "ERROR"]
+    assert len(notices) == 1, "once a minute, not once per persona"
+    assert notices[0]["payload"]["code"] == "panel_unavailable"
+    assert "about 17 min" in notices[0]["payload"]["message"]
+    await room.close()
+
+
 async def test_the_moderator_opens_and_hands_the_floor_to_the_student(
     client, candidate_auth, session_factory
 ):

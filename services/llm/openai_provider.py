@@ -21,7 +21,13 @@ import time
 from typing import Any
 
 from services.common.config import settings
-from services.llm.base import LLMError, LLMResult, ToolDefinition, ToolInvocation
+from services.llm.base import (
+    LLMError,
+    LLMResult,
+    QuotaExhausted,
+    ToolDefinition,
+    ToolInvocation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +37,11 @@ logger = logging.getLogger(__name__)
 _COOLING_UNTIL: dict[str, float] = {}
 
 
+#: A wait longer than this is a daily allowance, not a busy minute: the call
+#: fails at once with `QuotaExhausted` instead of sleeping through it.
+LONG_WAIT_SECONDS = 90.0
+
+
 async def _model_with_headroom(models: list[str]) -> str:
     """The first model not cooling; if all are, wait for the soonest to reopen."""
     now = time.monotonic()
@@ -38,8 +49,21 @@ async def _model_with_headroom(models: list[str]) -> str:
         if _COOLING_UNTIL.get(model, 0.0) <= now:
             return model
     soonest = min(models, key=lambda m: _COOLING_UNTIL.get(m, 0.0))
-    await asyncio.sleep(max(_COOLING_UNTIL[soonest] - now, 0.0))
+    wait = _COOLING_UNTIL[soonest] - now
+    if wait > LONG_WAIT_SECONDS:
+        raise QuotaExhausted(wait)
+    await asyncio.sleep(max(wait, 0.0))
     return soonest
+
+
+def allowance_back_in(models: list[str]) -> float | None:
+    """Seconds until one of `models` is usable again, if every one is out for longer
+    than a busy minute (a daily cap); None while any of them has headroom soon."""
+    now = time.monotonic()
+    waits = [_COOLING_UNTIL.get(model, 0.0) - now for model in models]
+    if not waits or min(waits) <= LONG_WAIT_SECONDS:
+        return None
+    return min(waits)
 
 
 class OpenAIProvider:
@@ -126,7 +150,7 @@ class OpenAIProvider:
                         if call := _refused_tool_call(again):
                             raise call from again
                         raise
-            except MisroutedToolCall:
+            except (MisroutedToolCall, QuotaExhausted):
                 raise
             except Exception as exc:
                 if attempt == 2 or not _is_retryable(exc):
@@ -222,6 +246,8 @@ class OpenAIProvider:
                 )
             except json.JSONDecodeError as exc:
                 last_error = exc
+            except QuotaExhausted:
+                raise  # retrying cannot help, and the caller says how long it will be
             except Exception as exc:
                 last_error = exc
                 if not _is_retryable(exc):
@@ -352,6 +378,8 @@ class OpenAIProvider:
                     }
                 )
                 continue
+            except QuotaExhausted:
+                raise
             except Exception as exc:
                 raise LLMError(f"openai tool request failed: {exc}") from exc
 
@@ -498,17 +526,21 @@ def _rate_limit_wait(exc: Exception) -> float | None:
     """Seconds to wait if `exc` is an HTTP 429, else None."""
     if getattr(exc, "status_code", None) != 429:
         return None
+    # Uncapped: a daily cap names minutes or hours ("try again in 19m57.5s"), and
+    # `_model_with_headroom` turns a wait that long into `QuotaExhausted`.
+    waits: list[float] = []
     headers = getattr(getattr(exc, "response", None), "headers", None) or {}
     retry_after = headers.get("retry-after")
     if retry_after:
         try:
-            return min(float(retry_after) + 0.5, 65.0)
+            waits.append(float(retry_after) + 0.5)
         except ValueError:
             pass
-    match = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", str(exc))
-    if match:
-        return min(int(match.group(1) or 0) * 60 + float(match.group(2)) + 0.5, 65.0)
-    return 10.0
+    match = re.search(r"try again in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?", str(exc))
+    if match and any(match.groups()):
+        hours, minutes, seconds = (float(g or 0) for g in match.groups())
+        waits.append(hours * 3600 + minutes * 60 + seconds + 0.5)
+    return max(waits) if waits else 10.0
 
 
 def _strict_compatible(schema: dict[str, Any]) -> bool:
@@ -548,6 +580,8 @@ def _strict_compatible(schema: dict[str, Any]) -> bool:
 def _is_retryable(exc: Exception) -> bool:
     """Rate limits, timeouts, connection drops and 5xx are worth another go; a
     400 means the request itself is wrong and will fail identically."""
+    if isinstance(exc, QuotaExhausted):
+        return False  # minutes or hours away: another go now fails the same way
     try:
         import openai
     except ImportError:  # pragma: no cover

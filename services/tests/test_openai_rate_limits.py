@@ -107,6 +107,53 @@ async def test_reasoning_effort_follows_the_model_actually_called(clean_state):
     assert "reasoning_effort" not in completions.requests[1]
 
 
+class DailyCap(Exception):
+    """Groq's answer once a model's tokens-per-day are spent (2026-10-19, verbatim shape)."""
+
+    status_code = 429
+    response = SimpleNamespace(headers={})
+
+    def __str__(self) -> str:
+        return (
+            "Error code: 429 - Rate limit reached for model `openai/gpt-oss-120b` on tokens "
+            "per day (TPD): Limit 200000, Used 199088, Requested 3684. "
+            "Please try again in 19m57.504s."
+        )
+
+
+async def test_a_daily_cap_on_every_model_fails_at_once_and_says_how_long(clean_state):
+    """It used to sleep 65 s ten times: a silent panel, a report spinning for 10 min."""
+    provider, completions = _provider(BIG, [DailyCap(), DailyCap()])
+    with pytest.raises(openai_provider.QuotaExhausted) as raised:
+        await provider.complete_json(system="s", prompt="p", schema={"type": "object"})
+    assert [r["model"] for r in completions.requests] == [BIG, SMALL]
+    assert clean_state == [], "nothing slept"
+    assert 19 * 60 < raised.value.retry_in <= 20 * 60
+    assert raised.value.minutes == 20
+
+
+async def test_a_daily_cap_on_one_model_moves_the_call_to_the_other(clean_state):
+    provider, completions = _provider(BIG, [DailyCap(), _reply()])
+    await provider.complete_json(system="s", prompt="p", schema={"type": "object"})
+    assert [r["model"] for r in completions.requests] == [BIG, SMALL]
+
+
+def test_allowance_is_back_in_the_soonest_long_wait_and_only_then():
+    now = openai_provider.time.monotonic()
+    openai_provider._COOLING_UNTIL.update({BIG: now + 1200, SMALL: now + 900})
+    assert 899 < openai_provider.allowance_back_in([BIG, SMALL]) <= 900
+    openai_provider._COOLING_UNTIL[SMALL] = now + 20  # a busy minute, not a daily cap
+    assert openai_provider.allowance_back_in([BIG, SMALL]) is None
+
+
+def test_the_vendors_hours_minutes_and_seconds_are_all_read():
+    class Hours(DailyCap):
+        def __str__(self) -> str:
+            return "Rate limit reached ... Please try again in 1h2m3.5s."
+
+    assert openai_provider._rate_limit_wait(Hours()) == 3600 + 120 + 3.5 + 0.5
+
+
 async def test_with_no_fallback_configured_a_429_still_waits_and_retries(clean_state):
     settings.llm_fallback_models = ""
     provider, completions = _provider(BIG, [RateLimited("7"), _reply()])

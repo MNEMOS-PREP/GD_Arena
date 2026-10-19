@@ -228,8 +228,14 @@ export function usePractice(sessionId: string | null) {
           pendingRef.current = { text: p.text, audio: p.audio, gender: p.gender };
           chunksRef.current = [];
           setThinking(p.candidate_label);
+          // The panel is speaking again: a notice that it couldn't is now stale.
+          setCore((prev) => (prev.error ? { ...prev, error: null } : prev));
           return;
         }
+        case "USER_TRANSCRIPT":
+          // Heard this time: "please say it again" no longer applies.
+          setCore((prev) => (prev.error ? { ...prev, error: null } : prev));
+          break;
         case "PERSONA_AUDIO_FALLBACK":
           if (pendingRef.current) pendingRef.current.audio = false;
           return;
