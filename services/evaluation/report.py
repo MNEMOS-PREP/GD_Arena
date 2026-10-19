@@ -16,6 +16,7 @@ from dataclasses import asdict, dataclass, field
 
 from services.common.contracts import CandidateMetrics, EvaluationOutput, RollingState
 from services.evaluation.aggregator import AggregatedScore
+from services.evaluation.spec_dimensions import spec_dimensions
 from services.metrics.engine import SessionMetrics
 
 # Design §34: who held the floor, and who barely did.
@@ -59,6 +60,8 @@ class CandidateReport:
     interruption_times: list[float] = field(default_factory=list)
     # M14 EC-14.1: moments someone turned to this candidate by name — openings.
     entry_moments: list[dict] = field(default_factory=list)
+    # FR-14.15: the spec's six contribution measures, counted in code, each with its basis.
+    spec_dimensions: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -78,6 +81,10 @@ class GroupReport:
     turning_point: str
     unresolved_questions: list[str]
     participation: dict[str, float]
+    # FR-14.16: per candidate, an index and whether a big share was leading or bulldozing.
+    domination: dict[str, dict] = field(default_factory=dict)
+    # FR-14.14: typed edges between contributions (answer, challenge, support, extend, new).
+    discourse_graph: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -98,6 +105,10 @@ def _rank_evidence(outputs: list[EvaluationOutput]) -> list[dict]:
     return sorted(items, key=lambda i: (-i["confidence"], i["timestamp"]))
 
 
+# FR-14.17: how long after being named a candidate has to reply before it counts as missed.
+ENTRY_GRACE_SECONDS = 12.0
+
+
 def _clock(seconds: float) -> str:
     whole = int(max(seconds, 0))
     return f"{whole // 60}:{whole % 60:02d}"
@@ -116,15 +127,23 @@ def entry_moments(
     if len(first) < 2:
         return []
     named = re.compile(rf"\b{re.escape(first)}\b", re.IGNORECASE)
+    own_starts = sorted(s.start for s in segments if s.candidate_id == candidate_label)
     return [
         {
             "timestamp": _clock(segment.start),
+            "seconds": round(float(segment.start), 2),
             "speaker": speaker_names.get(segment.candidate_id, segment.candidate_id),
             "line": segment.text,
             # The invitation itself: the sentence that names them.
             "quote": next(
                 (s for s in re.split(r"(?<=[.!?])\s+", segment.text) if named.search(s)),
                 segment.text,
+            ),
+            # FR-14.17: did they take it? A reply inside the grace window means yes;
+            # otherwise the floor went past them and it is a missed entry.
+            "missed": not any(
+                segment.end - 1.0 <= start <= segment.end + ENTRY_GRACE_SECONDS
+                for start in own_starts
             ),
         }
         for segment in segments
@@ -176,6 +195,15 @@ def _metric_observations(
             "you have a view on."
         )
         lines.extend(_moment_lines(moments, 2))
+    missed = [m for m in moments if m.get("missed")]
+    if missed and metrics.turns > 0:
+        first_miss = missed[0]
+        lines.append(
+            f"{len(missed)} time{'s' if len(missed) > 1 else ''} someone turned to you and the "
+            f"floor moved on. At {first_miss['timestamp']}, {first_miss['speaker']} said: "
+            f'"{_quoted(first_miss.get("quote") or first_miss["line"])}" — answer straight '
+            "away, even briefly, and the opening is yours."
+        )
     if metrics.interruptions >= 3:
         lines.append(
             f"You interrupted {metrics.interruptions} times. Letting a speaker finish "
@@ -202,6 +230,7 @@ def build_candidate_report(
     metrics: CandidateMetrics,
     synthesis: dict | None = None,
     moments: list[dict] | None = None,
+    segments: list | None = None,
 ) -> CandidateReport:
     """FR-29 + FR-30. `moments`: where someone turned to this candidate by name."""
     by_dimension = {output.dimension: output for output in outputs}
@@ -247,6 +276,9 @@ def build_candidate_report(
             penalty=score.penalty,
             interruption_times=score.interruption_times,
             entry_moments=moments or [],
+            spec_dimensions=spec_dimensions(
+                candidate_label, metrics, moments or [], segments or []
+            ),
         )
 
     feedback_parts = [
@@ -279,6 +311,7 @@ def build_candidate_report(
         penalty=score.penalty,
         interruption_times=score.interruption_times,
         entry_moments=moments or [],
+        spec_dimensions=spec_dimensions(candidate_label, metrics, moments or [], segments or []),
     )
 
 
@@ -339,4 +372,5 @@ def build_group_report(
         participation={
             label: round(m.participation_ratio, 4) for label, m in metrics.per_candidate.items()
         },
+        domination=metrics.domination(),
     )

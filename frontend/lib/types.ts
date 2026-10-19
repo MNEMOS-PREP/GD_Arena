@@ -261,6 +261,17 @@ export interface CandidateReportBody {
   /** Points deducted for interrupting, and when each interruption happened (s). */
   penalty?: number;
   interruption_times?: number[];
+  /** Moments someone turned to this candidate by name; `missed` = the floor moved on. */
+  entry_moments?: EntryMoment[];
+}
+
+export interface EntryMoment {
+  timestamp: string;
+  seconds: number;
+  speaker: string;
+  line: string;
+  quote: string;
+  missed: boolean;
 }
 
 /** One open lobby in the public browser. */

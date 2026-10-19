@@ -248,6 +248,22 @@ export async function uploadAudio(
   return response.json();
 }
 
+/** One line of a finished practice discussion, spoken (audio) or as text for the browser to voice. */
+export type MomentReplay = { kind: "audio"; url: string } | { kind: "text"; text: string };
+
+export async function momentReplay(sessionId: string, seconds: number): Promise<MomentReplay> {
+  const response = await fetch(
+    `${API_URL}/api/v1/practice/${sessionId}/moment-audio?seconds=${encodeURIComponent(seconds)}`,
+    { headers: tokenStore.access ? { Authorization: `Bearer ${tokenStore.access}` } : {} },
+  );
+  if (!response.ok) throw await toError(response);
+  if ((response.headers.get("content-type") ?? "").includes("application/json")) {
+    const body = (await response.json()) as { text: string };
+    return { kind: "text", text: body.text };
+  }
+  return { kind: "audio", url: URL.createObjectURL(await response.blob()) };
+}
+
 export const sessions = {
   create: (body: {
     topic: string;
@@ -307,6 +323,9 @@ export const practice = {
     duration_seconds?: number;
     preparation_seconds?: number;
     personas: PersonaChoice[];
+    format?: "open" | "for_against" | "case";
+    student_side?: "for" | "against";
+    case_brief?: string;
   }) => request<GDSession>("/api/v1/practice", { method: "POST", body, auth: true }),
 };
 

@@ -10,7 +10,7 @@ import random
 from dataclasses import asdict, dataclass
 
 from services.common.config import settings
-from services.practice.panel import sample_angles, sample_stances
+from services.practice.panel import assign_sides, sample_angles, sample_stances
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,16 +91,23 @@ PRESETS: dict[str, Persona] = {
 }
 
 # Transcript/turn labels for personas. Candidates are single letters (A, B...),
-# so "P1".."P4" can never collide with one.
+# so "P1".."P5" can never collide with one.
 PERSONA_LABEL_PREFIX = "P"
 
 
-def resolve_personas(requested: list[dict], rng: random.Random | None = None) -> list[dict]:
+def resolve_personas(
+    requested: list[dict],
+    rng: random.Random | None = None,
+    *,
+    student_side: str | None = None,
+) -> list[dict]:
     """Turn a request ({preset} or custom {name, persona, voice_id}) into stored rows.
 
     Each row also gets a sampled stance and private angle (panel.py), so a panel
-    disagrees instead of agreeing politely. Raises ValueError for an unknown preset
-    or an empty custom persona.
+    disagrees instead of agreeing politely. With `student_side` ("for" or "against",
+    the for/against format of FR-14.2) the stances are plain for or against instead,
+    split so some of the panel argues with the student. Raises ValueError for an
+    unknown preset or an empty custom persona.
     """
     rows: list[dict] = []
     for index, item in enumerate(requested, start=1):
@@ -130,8 +137,11 @@ def resolve_personas(requested: list[dict], rng: random.Random | None = None) ->
             }
         rows.append({"label": f"{PERSONA_LABEL_PREFIX}{index}", **row})
     rng = rng or random.Random()
-    for row, stance, angle in zip(
-        rows, sample_stances(len(rows), rng), sample_angles(len(rows), rng), strict=True
-    ):
+    stances = (
+        assign_sides(len(rows), student_side, rng)
+        if student_side
+        else sample_stances(len(rows), rng)
+    )
+    for row, stance, angle in zip(rows, stances, sample_angles(len(rows), rng), strict=True):
         row["stance"], row["angle"] = stance, angle
     return rows

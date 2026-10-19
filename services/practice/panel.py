@@ -47,6 +47,36 @@ ANGLES: tuple[tuple[str, str], ...] = (
     ("the long run", "what this leads to in five or ten years"),
 )
 
+#: What each angle's owner knows and the others may not raise (FR-14.4's "private
+#: knowledge"). Qualitative points and mechanisms only, never figures or sources,
+#: so a persona has something to bring that is not common to the whole panel.
+ANGLE_KNOWLEDGE: dict[str, tuple[str, ...]] = {
+    "cost": (
+        "the visible price is rarely the whole price: setup, upkeep and training recur",
+        "money spent here is money not spent elsewhere, so the real comparison is the alternative",
+    ),
+    "fairness": (
+        "a rule that looks neutral can still fall hardest on people with the least slack",
+        "those who are affected are seldom the ones who were asked",
+    ),
+    "employers": (
+        "hiring managers screen quickly and lean on proxies such as projects and references",
+        "most employers teach tools on the job and look for how a person learns and communicates",
+    ),
+    "students": (
+        "stress and workload change how much anyone can learn, whatever the policy intends",
+        "students adapt to the incentives in front of them, not to the intent behind them",
+    ),
+    "practicality": (
+        "plans usually fail at the handover between teams, not in the design",
+        "a pilot in one place is the cheapest way to find what breaks before scaling",
+    ),
+    "the long run": (
+        "small habits compound: what is easy now shapes what people expect later",
+        "decisions that are hard to reverse deserve more caution than ones that are easy to undo",
+    ),
+}
+
 #: Kept by every AI participant, in practice and in simulated group rooms.
 RULES = (
     "Ground rules you never break:\n"
@@ -107,6 +137,23 @@ def sample_stances(count: int, rng: random.Random) -> list[str]:
     return picked[:count]
 
 
+def assign_sides(count: int, student_side: str, rng: random.Random) -> list[str]:
+    """Stances for a for/against format (FR-14.2): the student is given a side.
+
+    No "it depends": each panelist is plainly for or against. Half of them, rounded
+    up, face the student from the other side, so there is always someone to argue
+    with, and the rest stand beside the student.
+    """
+    if count <= 0:
+        return []
+    mine = "support" if student_side == "for" else "oppose"
+    theirs = "oppose" if mine == "support" else "support"
+    against_student = (count + 1) // 2
+    sides = [theirs] * against_student + [mine] * (count - against_student)
+    rng.shuffle(sides)
+    return sides
+
+
 def sample_angles(count: int, rng: random.Random) -> list[str]:
     """One private angle per persona, no two the same."""
     names = [name for name, _ in ANGLES]
@@ -137,6 +184,17 @@ def angle_text(angle: str | None) -> str:
         if name == angle:
             return f"{name} — {description}"
     return ""
+
+
+def knowledge_text(angle: str | None) -> str:
+    """The private knowledge that goes with an angle, as one prompt paragraph."""
+    points = ANGLE_KNOWLEDGE.get(angle or "")
+    if not points:
+        return ""
+    return (
+        "What you know that others may not bring up (use it when it fits, in your own "
+        "words, and only as reasoning, never as a statistic): " + "; ".join(points) + "."
+    )
 
 
 def cue_text(
@@ -222,6 +280,8 @@ def persona_system(
         )
     if angle := angle_text(persona.get("angle")):
         parts.append(f"Your angle, the thing you know most about and come back to: {angle}.")
+        if knowledge := knowledge_text(persona.get("angle")):
+            parts.append(knowledge)
     if is_moderator:
         parts.append(
             "You also keep this discussion fair: you open it, make sure everyone — "
@@ -249,9 +309,7 @@ def persona_system(
             "words, say plainly that you are an AI participant, then carry on with the "
             "discussion."
         )
-    if instruction := cue_text(
-        cue, student=student, target=target, repeated=repeated, named=named
-    ):
+    if instruction := cue_text(cue, student=student, target=target, repeated=repeated, named=named):
         parts.append(instruction)
     parts.append(
         'Return JSON: {"speak": <bool>, "is_conclusion": <bool>, "text": "<what you say next>"}.'
