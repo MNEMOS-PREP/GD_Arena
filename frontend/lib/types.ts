@@ -263,6 +263,8 @@ export interface CandidateReportBody {
   interruption_times?: number[];
   /** Moments someone turned to this candidate by name; `missed` = the floor moved on. */
   entry_moments?: EntryMoment[];
+  /** FR-14.15: the spec's six contribution measures, counted from the transcript. */
+  spec_dimensions?: Record<string, SpecMeasure>;
 }
 
 export interface EntryMoment {
@@ -319,6 +321,26 @@ export interface GroupReportBody {
   participation: Record<string, number>;
   agent_conflicts?: string[];
   agent_failures?: string[];
+  /** FR-14.16: per speaker, leading versus bulldozing, all counted in code. */
+  domination?: Record<string, DominationEntry>;
+  /** FR-14.14: contributions linked by how each answers another. */
+  discourse_graph?: { counts: Record<string, number> };
+  /** Label -> name, AI panelists included. */
+  names?: Record<string, string>;
+}
+
+export interface DominationEntry {
+  index: number;
+  kind: "leading" | "bulldozing" | "balanced";
+  floor_share: number;
+  interrupt_rate: number;
+  uptake: number;
+}
+
+/** FR-14.15: one of the six contribution measures; `score` null = not measured. */
+export interface SpecMeasure {
+  score: number | null;
+  basis: string;
 }
 
 export interface ReportOut<T> {

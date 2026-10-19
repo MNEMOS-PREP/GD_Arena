@@ -449,6 +449,9 @@ async def run_job(session: AsyncSession, job: EvaluationJob) -> EvaluationJob:
     group = build_group_report(str(gd.id), gd.topic, scores, metrics, state)
     body = group.to_dict()
     body["discourse_graph"] = build_discourse_graph(segments, set(metrics.per_candidate))
+    # Who each label is, AI panelists included, so the domination index and the
+    # discourse graph can name people rather than show "P2".
+    body["names"] = speaker_names
     # The group report agent writes the narrative; every figure in `body` stays computed.
     narrative = await synthesise_group(gd.topic, scores, names, metrics, state, syntheses)
     if narrative:

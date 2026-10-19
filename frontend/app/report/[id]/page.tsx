@@ -641,6 +641,8 @@ function AnalysisTab({
 
       <ScoreBreakdown body={body} session={session} />
 
+      <ContributionMeasures measures={body.spec_dimensions} />
+
       <h3 className="report-section">Why each score: the evaluators&rsquo; reasoning</h3>
       <div className="dimension-grid">
         {body.dimensions.map((dimension) => (
@@ -926,6 +928,107 @@ function MetricsGrid({ metrics }: { metrics: CandidateReportBody["metrics"] }) {
   );
 }
 
+/** FR-14.15's six measures, in the order a discussion runs, named for a student. */
+const MEASURES: [string, string][] = [
+  ["entry_skill", "Taking openings"],
+  ["novelty", "New points"],
+  ["uptake", "Building on others"],
+  ["listening", "Listening"],
+  ["floor_dynamics", "Sharing the floor"],
+  ["closure", "Summing up"],
+];
+
+/**
+ * The six contribution measures, counted from the transcript (FR-14.15). Each shows
+ * what it was counted from, because these are proxies a student should be able to
+ * check and question, and none of them moves the overall score.
+ */
+function ContributionMeasures({ measures }: { measures?: CandidateReportBody["spec_dimensions"] }) {
+  if (!measures || Object.keys(measures).length === 0) return null;
+  return (
+    <section className="narrative">
+      <h3 className="report-section">How you took part</h3>
+      <p className="meta" style={{ margin: "0 0 0.6rem" }}>
+        Counted from the transcript, not judged by a model. Each says what it was counted from.
+        They do not change your overall score.
+      </p>
+      <div className="dimension-grid">
+        {MEASURES.filter(([key]) => measures[key]).map(([key, label]) => {
+          const { score, basis } = measures[key];
+          return (
+            <div key={key} className="dimension-card">
+              <div className="row row--between">
+                <strong>{label}</strong>
+                {score == null ? (
+                  <span className="meta">not measured</span>
+                ) : (
+                  <span className={`dimension-score ${scoreClass(score * 10)}`}>
+                    {score.toFixed(1)}
+                    <small>/10</small>
+                  </span>
+                )}
+              </div>
+              {score != null && (
+                <AnimatedBar value={score * 10} tone={scoreTone(score * 10)} />
+              )}
+              <p className="meta" style={{ margin: "0.4rem 0 0" }}>
+                {basis}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+const DOMINATION_WORDS: Record<string, string> = {
+  leading: "holds the floor and builds on others",
+  bulldozing: "holds the floor by cutting in or talking past others",
+  balanced: "a fair share",
+};
+const EDGE_WORDS: [string, string][] = [
+  ["answer", "answers"],
+  ["challenge", "challenges"],
+  ["support", "supports"],
+  ["extend", "follow-ons"],
+  ["new", "new threads"],
+];
+
+/** FR-14.16 and FR-14.14 for the host: who led, who bulldozed, how points connected. */
+function FloorAndFlow({ body }: { body: GroupReportBody }) {
+  const domination = Object.entries(body.domination ?? {}).sort(
+    (a, b) => b[1].floor_share - a[1].floor_share,
+  );
+  const counts = body.discourse_graph?.counts;
+  if (domination.length === 0 && !counts) return null;
+  const nameOf = (label: string) => body.names?.[label] ?? label;
+  return (
+    <>
+      <dt>Floor and flow</dt>
+      <dd>
+        {domination.length > 0 && (
+          <ul style={{ margin: "0.2rem 0 0.6rem", paddingLeft: "1.2rem" }}>
+            {domination.map(([label, d]) => (
+              <li key={label}>
+                <strong>{nameOf(label)}</strong>: {Math.round(d.floor_share * 100)}% of the floor —{" "}
+                {DOMINATION_WORDS[d.kind] ?? d.kind}
+              </li>
+            ))}
+          </ul>
+        )}
+        {counts && (
+          <p className="meta" style={{ margin: "0 0 0.9rem" }}>
+            How contributions connected:{" "}
+            {EDGE_WORDS.map(([key, word]) => `${counts[key] ?? 0} ${word}`).join(" · ")}. Read from
+            the wording of each line, so a guide rather than a verdict.
+          </p>
+        )}
+      </dd>
+    </>
+  );
+}
+
 function GroupReportCard({ body }: { body: GroupReportBody }) {
   return (
     <div className="card">
@@ -961,6 +1064,8 @@ function GroupReportCard({ body }: { body: GroupReportBody }) {
           </dd>
         </>
       )}
+
+      <FloorAndFlow body={body} />
 
       <dt>Turning point</dt>
       <dd>{body.turning_point}</dd>

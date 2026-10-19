@@ -8,19 +8,31 @@ challenge it. Nothing here calls a model.
 """
 
 import re
+import string
 from collections.abc import Sequence
 
 from services.common.contracts import CandidateMetrics
 
+# Summing-up phrases, English and Hindi. A wording signal only: closure is also
+# recognised from what a late contribution does (`_draws_together`), whatever
+# the language, so a student is never scored on which language they spoke.
 _CLOSURE = re.compile(
     r"\b(to sum up|to summari[sz]e|in summary|in conclusion|to conclude|so overall|"
     r"overall,|the way forward|where we agree|what we agree|we can all agree|"
-    r"my closing|to wrap up)\b",
+    r"my closing|to wrap up)\b|कुल मिलाकर|निष्कर्ष|सारांश|अंत में",
     re.IGNORECASE,
 )
-_WORD = re.compile(r"[a-z']{4,}")
+_PUNCTUATION = string.punctuation + "।॥“”‘’…—–"
+# Content words: four or more characters, in any script. Splitting on spaces, not
+# on [a-z], is what lets a Hindi or Hindi-English turn count (Day 5 review: the
+# same point scored 10/10 in English and 0/10 in Hindi).
+_MIN_WORD = 4
 # A line whose content words are this largely already said by someone is a repeat.
 _REPEAT_SHARE = 0.6
+# Closure by what a contribution does: late in the discussion, and drawing on the
+# points of at least this many other speakers.
+_LATE_SHARE = 0.6
+_DRAWS_ON = 2
 
 
 def _ten(value: float) -> float:
@@ -28,7 +40,30 @@ def _ten(value: float) -> float:
 
 
 def _words(text: str) -> set[str]:
-    return set(_WORD.findall((text or "").lower()))
+    tokens = (t.strip(_PUNCTUATION) for t in (text or "").lower().split())
+    return {t for t in tokens if len(t) >= _MIN_WORD and not t.isdigit()}
+
+
+def _draws_together(label: str, segments: Sequence) -> int:
+    """Late contributions that pull together at least two other speakers' points."""
+    ordered = sorted(segments, key=lambda s: s.start)
+    if not ordered:
+        return 0
+    start, end = ordered[0].start, max(s.end for s in ordered)
+    late_from = start + _LATE_SHARE * (end - start)
+    count = 0
+    for index, segment in enumerate(ordered):
+        if segment.candidate_id != label or segment.start < late_from:
+            continue
+        words = _words(segment.text)
+        drawn = {
+            earlier.candidate_id
+            for earlier in ordered[:index]
+            if earlier.candidate_id != label and len(words & _words(earlier.text)) >= 2
+        }
+        if len(drawn) >= _DRAWS_ON:
+            count += 1
+    return count
 
 
 def _novelty(label: str, segments: Sequence) -> tuple[float, str]:
@@ -52,7 +87,8 @@ def spec_dimensions(
     moments: Sequence[dict],
     segments: Sequence,
 ) -> dict[str, dict]:
-    """Per measure: `{"score": 0-10, "basis": what was counted}`."""
+    """Per measure: `{"score": 0-10, or None when there was nothing to measure,
+    "basis": what was counted}`."""
     if metrics.turns == 0:
         return {}
     turns = metrics.turns
@@ -70,13 +106,18 @@ def spec_dimensions(
 
     if moments:
         taken = sum(1 for m in moments if not m.get("missed"))
-        entry = taken / len(moments)
-        entry_basis = f"{taken} of {len(moments)} invitations by name were taken within seconds"
+        entry: float | None = taken / len(moments)
+        entry_basis = (
+            f"{taken} of {len(moments)} invitations by name were taken before the floor moved on"
+        )
     else:
-        entry, entry_basis = 1.0, "nobody turned to them by name, so nothing was missed"
+        # No invitation, no evidence either way: not measured, rather than a full mark.
+        entry, entry_basis = None, "nobody invited them in by name, so this was not measured"
 
     own_text = [s.text for s in segments if s.candidate_id == label]
-    closed = sum(1 for text in own_text if _CLOSURE.search(text or ""))
+    phrased = sum(1 for text in own_text if _CLOSURE.search(text or ""))
+    drawn = _draws_together(label, segments)
+    closed = max(phrased, drawn)
     closure = 1.0 if closed else 0.0  # one real summing-up is the full mark
 
     novelty, novelty_basis = _novelty(label, segments)
@@ -92,7 +133,7 @@ def spec_dimensions(
             "basis": f"{metrics.participation_ratio:.0%} of the floor, "
             f"{metrics.interruptions} interruptions over {turns} turns",
         },
-        "entry_skill": {"score": _ten(entry), "basis": entry_basis},
+        "entry_skill": {"score": None if entry is None else _ten(entry), "basis": entry_basis},
         "listening": {
             "score": _ten(listening),
             "basis": f"{metrics.responses} replies and {metrics.questions} questions, "
@@ -100,6 +141,9 @@ def spec_dimensions(
         },
         "closure": {
             "score": _ten(closure),
-            "basis": f"{closed} contribution{'s' if closed != 1 else ''} summed the discussion up",
+            "basis": (
+                f"{closed} contribution{'s' if closed != 1 else ''} summed the discussion up"
+                + (" (drawing on others' points late on)" if drawn and not phrased else "")
+            ),
         },
     }

@@ -127,28 +127,53 @@ def entry_moments(
     if len(first) < 2:
         return []
     named = re.compile(rf"\b{re.escape(first)}\b", re.IGNORECASE)
-    own_starts = sorted(s.start for s in segments if s.candidate_id == candidate_label)
-    return [
-        {
-            "timestamp": _clock(segment.start),
-            "seconds": round(float(segment.start), 2),
-            "speaker": speaker_names.get(segment.candidate_id, segment.candidate_id),
-            "line": segment.text,
-            # The invitation itself: the sentence that names them.
-            "quote": next(
-                (s for s in re.split(r"(?<=[.!?])\s+", segment.text) if named.search(s)),
-                segment.text,
-            ),
-            # FR-14.17: did they take it? A reply inside the grace window means yes;
-            # otherwise the floor went past them and it is a missed entry.
-            "missed": not any(
-                segment.end - 1.0 <= start <= segment.end + ENTRY_GRACE_SECONDS
-                for start in own_starts
-            ),
-        }
-        for segment in segments
-        if segment.candidate_id != candidate_label and named.search(segment.text or "")
-    ]
+    ordered = sorted(segments, key=lambda s: s.start)
+    moments = []
+    for segment in ordered:
+        if segment.candidate_id == candidate_label or not named.search(segment.text or ""):
+            continue
+        # The sentence that names them. Only an invitation counts — a question to
+        # them, or a line that opens on their name — not a passing mention such as
+        # "building on Asha's point", which offers them nothing (Day 5 review).
+        quote = next(
+            (s for s in re.split(r"(?<=[.!?।])\s+", segment.text) if named.search(s)),
+            segment.text,
+        )
+        bare = quote.strip().lstrip("\"'“‘(")
+        if not (bare.rstrip(" \"'”’)").endswith("?") or named.match(bare)):
+            continue
+        moments.append(
+            {
+                "timestamp": _clock(segment.start),
+                "seconds": round(float(segment.start), 2),
+                "speaker": speaker_names.get(segment.candidate_id, segment.candidate_id),
+                "line": segment.text,
+                "quote": quote,
+                # FR-14.17: did they take it?
+                "missed": not _took_the_floor(ordered, segment, candidate_label),
+            }
+        )
+    return moments
+
+
+def _took_the_floor(ordered: list, invitation, label: str) -> bool:
+    """Whether the candidate answered an invitation before the floor moved on.
+
+    Taken if theirs is the next voice after it — however long they took, so a
+    typed reply, or a spoken one waiting on transcription, is not "missed" — or
+    if they came in within the grace window even though someone else did too.
+    """
+    after = [s for s in ordered if s is not invitation and s.start >= invitation.end - 1.0]
+    for segment in after:
+        if segment.candidate_id == label:
+            return True
+        if segment.candidate_id != invitation.candidate_id:
+            # Someone else spoke first: taken only if they too came in at once.
+            return any(
+                s.candidate_id == label and s.start <= invitation.end + ENTRY_GRACE_SECONDS
+                for s in after
+            )
+    return False
 
 
 def _quoted(line: str, words: int = 20) -> str:

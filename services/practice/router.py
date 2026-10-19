@@ -80,8 +80,10 @@ class PracticeCreate(BaseModel):
     def framed_topic(self) -> str:
         """The topic as the room and the report will see it, with the format spelled out."""
         if self.format == "for_against":
+            # Third person, because the panel reads it too: "You argue FOR" beside a
+            # persona's own "You OPPOSE" told that persona both (Day 5 review).
             side = "FOR" if self.student_side == "for" else "AGAINST"
-            return f"{self.topic.strip()} (You argue {side} the motion.)"
+            return f"{self.topic.strip()} (For/against: the student argues {side} the motion.)"
         if self.format == "case":
             return f"{self.topic.strip()}\n\nCase: {(self.case_brief or '').strip()}"
         return self.topic

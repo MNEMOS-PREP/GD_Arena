@@ -123,3 +123,26 @@ def test_an_active_candidate_is_told_about_the_entry_they_missed():
     joined = " ".join(report.weaknesses)
     assert "1 time someone turned to you and the floor moved on" in joined
     assert "At 0:04, Chitra said" in joined
+
+
+def test_a_typed_reply_that_comes_next_is_taken_not_missed():
+    """Day 5 review: any reply after 12 s was "missed", so a typed answer always was."""
+    segs = [
+        TranscriptSegment(session_id="s", confidence=0.9, candidate_id="P3", start=4.0, end=9.0,
+                          text="Asha, what's your view on stipends?"),
+        TranscriptSegment(session_id="s", confidence=0.9, candidate_id="A", start=30.0, end=40.0,
+                          text="Stipends should be the floor, not the ceiling."),
+    ]  # fmt: skip
+    assert [m["missed"] for m in entry_moments(segs, "A", "Asha Rao", NAMES)] == [False]
+
+
+def test_a_passing_mention_is_not_an_opening():
+    """'Building on Asha's point' offers nothing; only an invitation is an opening."""
+    segs = [
+        TranscriptSegment(session_id="s", confidence=0.9, candidate_id="P1", start=4.0, end=9.0,
+                          text="Building on Asha's point, cost matters too."),
+        TranscriptSegment(session_id="s", confidence=0.9, candidate_id="P2", start=10.0, end=14.0,
+                          text="Asha Rao, please go ahead."),
+    ]  # fmt: skip
+    moments = entry_moments(segs, "A", "Asha Rao", NAMES)
+    assert [m["timestamp"] for m in moments] == ["0:10"]  # the direct address, not the mention

@@ -93,3 +93,34 @@ def test_the_candidate_report_carries_them():
     )
     report = build_candidate_report("A", "Asha Rao", score, [], _metrics(), segments=SEGMENTS)
     assert "listening" in report.to_dict()["spec_dimensions"]
+
+
+def test_a_hindi_contribution_is_measured_like_an_english_one():
+    """Day 5 review: the same point scored novelty 10 in English and 0 in Hindi."""
+    opener = _seg("P1", 0, 5, "Should colleges make internships mandatory?")
+    english = [opener, _seg("A", 6, 12, "Experience teaches what lectures cannot, so yes.")]
+    hindi = [opener, _seg("A", 6, 12, "मुझे लगता है कि अनुभव वह सिखाता है जो कक्षा नहीं सिखाती")]
+    in_english = spec_dimensions("A", _metrics(turns=1), [], english)["novelty"]
+    in_hindi = spec_dimensions("A", _metrics(turns=1), [], hindi)["novelty"]
+    assert in_hindi["score"] == in_english["score"] == 10.0
+    assert in_hindi["basis"] != "no contributions to judge"
+
+
+def test_entry_skill_is_not_measured_when_nobody_invited_them():
+    """Day 5 review: never being invited used to score a full 10."""
+    entry = spec_dimensions("A", _metrics(), [], SEGMENTS)["entry_skill"]
+    assert entry["score"] is None and "not measured" in entry["basis"]
+
+
+def test_a_late_turn_that_pulls_others_together_is_closure_in_any_language():
+    """Closure is what a contribution does, not only an English phrase."""
+    talk = [
+        _seg("P1", 0, 10, "Stipends decide whether poorer students can take internships at all."),
+        _seg("P2", 11, 20, "Colleges should vet companies first, or it is free labour."),
+        _seg("A", 21, 28, "I think that is fair."),
+        _seg("A", 70, 80, "So stipends for poorer students, and colleges vet companies first."),
+    ]
+    result = spec_dimensions("A", _metrics(), [], talk)["closure"]
+    assert result["score"] == 10.0 and "drawing on others" in result["basis"]
+    early_only = talk[:3]
+    assert spec_dimensions("A", _metrics(), [], early_only)["closure"]["score"] == 0.0

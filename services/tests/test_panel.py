@@ -615,7 +615,9 @@ async def test_for_against_and_case_formats_shape_the_room(client: AsyncClient, 
         headers=candidate_auth,
     )
     assert fa.status_code == 201, fa.text
-    assert fa.json()["topic"].endswith("(You argue FOR the motion.)")
+    assert fa.json()["topic"].endswith("(For/against: the student argues FOR the motion.)")
+    # The panel reads the topic too: nothing in it may tell a persona "you argue FOR".
+    assert "You argue" not in fa.json()["topic"]
 
     case = await client.post(
         "/api/v1/practice",
