@@ -1,8 +1,8 @@
 # M14 — TODO · Group Discussion Arena
 
-> **Completion: 64%** — 10 of 21 functional requirements met, 7 partially (after Day 4 of the wrap-up, 19 Oct; 33% on 17 Oct, 43% after Day 2, 62% after Day 3). A GD platform exists — built by GS Adithya Krishna and abhinav from 2026-10-04, **on branches** (`groq-edge-tts` holds all of it; `main` has only the initial commit) and to its own design document (`claude/docs/design.md`) rather than this spec. So it meets several requirements by a different route and misses the spec's distinctive ones: the discourse graph, anti-convergence, speculative pre-generation, missed entry moments. Since Day 4 (19 Oct) it is part of the platform: it signs in with Platform_Core's identity, opens from the shell's menu at `/gd`, and sends its results to the skill graph (M04).
+> **Completion: 67%** — 11 of 21 functional requirements met, 6 partially (after Day 5's walk, 19 Oct; 33% on 17 Oct, 43% after Day 2, 62% after Day 3, 64% after Day 4). Four of the five release gates met, the fifth partly. A GD platform exists — built by GS Adithya Krishna and abhinav from 2026-10-04, **on branches** (`groq-edge-tts` holds all of it; `main` has only the initial commit) and to its own design document (`claude/docs/design.md`) rather than this spec. So it meets several requirements by a different route and misses the spec's distinctive ones: the discourse graph, anti-convergence, speculative pre-generation, missed entry moments. Since Day 4 (19 Oct) it is part of the platform: it signs in with Platform_Core's identity, opens from the shell's menu at `/gd`, and sends its results to the skill graph (M04).
 >
-> _Method: `(met + ½ × partial) ÷ total`, counted from the spec, 2026-08-28; audited against the `groq-edge-tts` branch's code on 2026-10-17 (0% → 33%); re-counted on `wrap-up` after Day 2, 2026-10-18 (33% → 43%), after Day 3 the same day (43% → 62%), and after Day 4 on 19 Oct (62% → 64%: FR-14.7's 350 ms bound shown). One measure applied the same way to all nineteen modules so they compare; it counts requirements, not screens or gates._
+> _Method: `(met + ½ × partial) ÷ total`, counted from the spec, 2026-08-28; audited against the `groq-edge-tts` branch's code on 2026-10-17 (0% → 33%); re-counted on `wrap-up` after Day 2, 2026-10-18 (33% → 43%), after Day 3 the same day (43% → 62%), after Day 4 on 19 Oct (62% → 64%: FR-14.7's 350 ms bound shown), and after Day 5's walk the same day (64% → 67%: FR-14.20's overlap shown in a five-participant session). One measure applied the same way to all nineteen modules so they compare; it counts requirements, not screens or gates._
 
 Task list for taking **M14 — Group Discussion Arena** to 100% of [M14_GD_Arena.md](M14_GD_Arena.md).
 
@@ -33,7 +33,7 @@ suggested from who built each part — adjust them.
 | **2 · Sun 18 Oct** ✅ | A panel that behaves like one | A moderator persona: an opening round that invites the student (EC-14.1), a redirect when one voice dominates (EC-14.2), a closing call (FR-14.3); stances sampled per persona (FR-14.4); an anti-convergence block, and a curveball after three yields (FR-14.5, EC-14.4); a bid scheduler — eagerness × relevance × time since last turn (FR-14.6); personas admit they are AI when asked (AC-14.5, EC-14.14); no invented statistics (6) | Adithya | ✅ **Done 18 Oct** (`fe22deb`, `ab246fa`, `2dea9f6`, `aa4625d` on `wrap-up`): live, the moderator opened with "Asha, what's your take first?", all three personas spoke, no line repeated another, nothing invented; "are you a bot?" answered honestly 6 of 6 by the model with the turn instruction, guaranteed by a guard; replies 0.9–1.45 s (a barge-in reply had waited 14.6 s — fixed); 0 persona and 0 evaluator failures; 405 tests |
 | **3 · Mon 19 Oct** ✅ | What the student sees | Text GD mode — typed turns, same scheduler and scoring (FR-14.19); live speaking-time bars (FR-14.11); a recent-ideas strip (FR-14.13); raise-hand (FR-14.12); a silent student's report that encourages and does not contradict itself (EC-14.1, blocker 8) | abhinav | 🟡 **Built 18 Oct, a day early** (`6fcd1d1`, `091891d` on `wrap-up`). In a real browser (headless Edge): "Type instead" starts the session live, typed turns are answered, "are you a bot?" typed → "I'm an AI participant…", raise hand → "Asha Rao, please go ahead", the bars move, the ideas strip shows two ideas and an open question, no console errors. Found and fixed on the way: with no preparation the page never learned the discussion had started (composer disabled, microphone deaf). ✅ **Both morning checks done 19 Oct** (`1258678`): a silent student's report is kind all the way through — the narrative is now written without a model (told to be kind, it still opened "you contributed nothing"), and it quotes the real invitation; typed turns re-walked, credited by their spoken length (0:05 for one point, was 0:01). Also: a pending raised hand is cancelled when the student comes in on their own. 421 tests |
 | **4 · Tue 20 Oct** ✅ | Part of the platform | Sign in with the platform session (Platform_Core identity), not a second account; ports 8114 / 5214 and the platform's start script; a "Group discussion" entry in the shell; GD results reach the skill graph as M04 observations; measure barge-in (AC-14.2, ≤ 350 ms) and floor grant → first audio (AC-14.6, ≤ 800 ms) | Ansh | ✅ **Done 19 Oct, a day early** (`677f8b4`, `6b9cba0` on `wrap-up`; the shell's side on Platform_Shell branch `feat/gd-entry`, `b18024f`, not merged). Live, in headless Edge: a student signed in on `:5173` opened **Group discussion** from the menu, practised (typed) inside the frame — GD's own brand and sign-out gone — finished, and their skill graph gained a **Communication** group: Listening to the Question, Structuring an Answer, Handling Interruptions, "just started · tested 1×" (15 → 18 topics with evidence). M04 records GD's evidence but by its own rule (EC-4.17) does not move the ability estimate; BKT p(known) did move (0.44, then 0.78 after a second session). Content and leadership have no honest M04 concept and are not sent; critical thinking is sent when the GD type scores it. `start_gd.bat` opened both tabs and the platform's `stop` closed them; the model key appears on no command line. **Found and fixed on the way:** the report page never noticed a report it was opened before ("updates by itself" while it never asked again); a nameless platform student was "Student" and the moderator invited himself; `.local` addresses failed email validation, so every response with one would 500; a package named `platform` shadowed Python's own; and with no speech-to-text engine the stub would have turned a spoken turn into canned sentences, scored them and quoted them to M04 — now nothing is sent with the stub, and the platform runs Groq's Whisper on the same key (heard word for word). **Measured** (12 lines, 6 barge-ins): barge-in — the server stops a line **8–13 ms** after the student starts; with the browser's voice detector (3 × 2048-sample frames, ~128–171 ms) about **150–230 ms**, inside AC-14.2's 350 ms, not yet measured with a real microphone. Floor grant → first audio — **p95 4.5 s, median 3.2 s: fails AC-14.6 (800 ms)**. The model takes 0.73 s; Edge speech 1.25 s to its first chunk and 2.2 s to a playable line, and the browser plays only once the whole line has arrived. A student hears a reply ~3.8 s after they stop (the 1.1–1.4 s on Days 1–2 was to the text). On this connection Whisper adds 1.5–13 s to a spoken turn (variable; typed turns skip it). 454 tests |
-| **5 · Wed 21 Oct** | Proven and merged | Walk the 5 gates and 15 edge cases and write the results here; a two-browser human room on Docker/LiveKit; merge `wrap-up` → `main`; README and this TODO brought to the new state | all | the gates written up here, and `main` carries GD |
+| **5 · Wed 21 Oct** 🟡 | Proven and merged | Walk the 5 gates and 15 edge cases and write the results here; a two-browser human room on Docker/LiveKit; merge `wrap-up` → `main`; README and this TODO brought to the new state | all | 🟡 **Walked 19 Oct** (`b2e81b0`, `d0f6347`, `998784f`, `0b0a348` on `wrap-up`): the gates and edge cases are written up below. **Gates:** AC-14.1 ✅, AC-14.2 ✅, AC-14.4 ✅ (fixed), AC-14.5 ✅, AC-14.3 🟡. **Edge cases:** 5 ✅, 2 🟡, 8 ⬜ — the ⬜ ones are human rooms, features not built, or (EC-14.10) not yet shown. **Ports:** GD now takes only PORTS.txt's: API 8114 and web 5214 standalone too (it took 8000, the gateway's, and 3000, on the do-not-use list), Grafana 8314 by the 83xx ops-app rule (it took 3001, Langfuse's), Prometheus no host port (9090 is a native service here); its containers' ports recorded in a new PORTS.txt section, and all ten PORTS.txt copies made identical. **Not done, by the user's call ("don't use docker unnecessarily, deployment is not needed"):** the two-browser human room over LiveKit, so EC-14.3, 14.5, 14.11 and 14.12 were not walked. **Still to do:** merge `wrap-up` → `main` (a team call), and the README pass. 465 tests |
 
 **AC-14.6 after Day 4 — the call to make.** 800 ms from floor grant to sound cannot be met by tuning: the line is written after the floor is granted (0.73 s) and Edge speech needs 1.25 s to its first chunk. Two changes together could: (1) play each line from its first chunk instead of when it has fully arrived (about −1 s); (2) FR-14.8, writing the next bidders' lines while the student is still speaking, so the model's time leaves the path. FR-14.8 is in the deferred list below; moving it forward is the user's decision.
 
@@ -46,7 +46,48 @@ human + AI rooms (the rest of FR-14.1); case, for/against and fishbowl formats
 
 **Target:** about 69% of the 21 requirements by Wed 21 Oct (33% today) if every
 day lands — 11 met, 7 partly, the 3 above deferred — with all five release
-gates checked.
+gates checked. **Reached 67% on 19 Oct**, four gates met and AC-14.3 partly.
+
+### 2026-10-19 — Day 5's walk: what it found
+
+Walked on the platform build (no Docker): a voice session in headless Edge with a
+synthetic microphone, and three socket sessions. Scripts in the session scratchpad
+(`gd_day5_room.mjs`, `gd_day5_edges.mjs`).
+
+1. ✅ **Gates measured, not assumed.** Barge-in end to end in the browser: 184–205 ms
+   from the voice reaching the microphone to the persona's audio pausing (voice
+   detector 168–191 ms, server 13–17 ms, page <1 ms; n=6). A five-participant
+   session: 9 turns, 5 speakers, 165 s, 0.0% recorded overlap. "Hang on, are you a
+   bot?" said aloud → "I'm an AI participant…".
+2. ✅ **A leaderboard, removed.** The host's results were sorted best-first with a
+   trophy on the top scorer, and anyone can host a room of friends (Trap 6). Now
+   seat order, no trophy; a candidate still reads only their own report.
+3. ✅ **Hindi and mixed speech scored on content.** Transcribed exactly by Whisper,
+   answered on its point, and a rule in every evaluator now says language, accent
+   and switching never lower a score.
+4. 🟡 **An insult went unanswered and was praised.** "You lot are idiots, shut up"
+   → the panel carried on, and the report called the student's etiquette
+   respectful. The scoring is fixed (insults are disruptive conduct); a moderator
+   who intervenes, and removal on repeat, are not built (EC-14.9).
+5. ✅ **The model's daily allowance — the real ceiling.** Groq's free tier caps each
+   model at **200K tokens a day**; a day of testing spent both models (199,088 and
+   198,467). A session with its report costs roughly 40–50K tokens, so one free
+   organization supports **about four to eight practice sessions a day**, shared
+   with every other module on the same key. GD then slept 65 s ten times per call:
+   a silent panel with no word why, and reports that failed after ten minutes and
+   were never written. Fixed (`0b0a348`): a daily cap fails at once with how long it
+   will be; the room tells the student ("back in about N min"); a report waits with
+   a plain sentence and is written by itself when the allowance is back. **Capacity
+   for more students is a decision: a paid tier, or a second provider.**
+6. ✅ **A report a restart cut off stayed "analysing" for good.** The job stayed
+   RUNNING; the worker now writes such reports again when it starts.
+7. ⬜ **Back-to-back sessions starve the panel.** A report being written falls back
+   to the personas' model when its own is busy, so a student who starts a second
+   practice straight after the first can meet a slow or silent panel (seen: a 30 s
+   opening, raised hands not invited). Not fixed: the cure is to keep reports off
+   the personas' model while a room is live.
+8. ⬜ **One unidentified flaky test**: one failure in five full runs, not reproduced
+   in eighteen runs of the timing-sensitive files.
 
 ### 2026-10-17 — the first real run: what it took, and what broke
 
@@ -237,7 +278,7 @@ Spec §4, verbatim; status from the 2026-10-17 audit of `groq-edge-tts`.
 | FR-14.17 | ⬜ Missed-entry-moment detection with audio playback | P1 |
 | FR-14.18 | ✅ Private individual debriefs; no public quality ranking — each candidate sees only their own report; the host sees the group report; nothing ranks | P0 |
 | FR-14.19 | ✅ Text GD mode with the same scheduler and scoring — typed turns take the spoken path minus speech-to-text, never cut anyone off, and hold the floor for their spoken length (Day 3) | P0 |
-| FR-14.20 | 🟡 Overlap < 4% of wall clock in a 5-participant session — overlap is measured; the target is not demonstrated | P0 |
+| FR-14.20 | ✅ Overlap < 4% of wall clock in a 5-participant session — shown in a practice session, the student and four AI personas: 0.0% recorded, under 1% counting six barge-ins (Day 5); a room of five humans not walked | P0 |
 | FR-14.21 | ⬜ AI contribution latency after floor grant p95 < 800 ms — measured Day 4: p95 4.5 s (model 0.73 s, speech to a playable line 2.2 s, played only when whole); needs play-on-first-chunk and FR-14.8 together | P0 |
 
 ---
@@ -248,11 +289,11 @@ Spec §13. A **[GATE]** is release-blocking; the rest are tracked.
 
 | AC | | Target |
 |---|---|---|
-| AC-14.1 **[GATE]** | ⬜ Overlap in a 5-participant session | < 4% of wall clock |
-| AC-14.2 **[GATE]** | 🟡 Human barge-in stops AI — server 8–13 ms (p95 13 ms, n=6), ~150–230 ms with the browser's voice detector; to measure end-to-end with a microphone on Day 5 | ≤ 350 ms |
-| AC-14.3 **[GATE]** | 🟡 AI panel stance divergence (min pairwise) — distinct stances up to three personas; a fourth shares a stance, distinct by angle; not yet measured as a pairwise score | above threshold, 100% of sessions |
-| AC-14.4 **[GATE]** | ⬜ No public individual quality ranking | design + UI test |
-| AC-14.5 **[GATE]** | ✅ AI participants identify as AI when asked — prompt rule + turn instruction (6/6 live) + a guard that guarantees it | 100% |
+| AC-14.1 **[GATE]** | ✅ Overlap in a 5-participant session — 0.0% recorded over 165 s, 9 turns, 5 speakers; under 1% counting barge-ins physically (Day 5, practice; humans-only not walked) | < 4% of wall clock |
+| AC-14.2 **[GATE]** | ✅ Human barge-in stops AI — 184–205 ms end to end in the browser, voice at the microphone to the persona's audio paused (n=6, Day 5); only the physical mic and speaker are outside the loop | ≤ 350 ms |
+| AC-14.3 **[GATE]** | 🟡 AI panel stance divergence (min pairwise) — in 40,000 sampled panels no two personas ever share both stance and angle (min pairwise 1.0 up to three personas, 0.5 at four); divergent live, but not yet measured on what they say | above threshold, 100% of sessions |
+| AC-14.4 **[GATE]** | ✅ No public individual quality ranking — the room shows floor time only; a candidate reads only their own report (API tests); the host's best-first table with a trophy is now seat order, no trophy (Day 5) | design + UI test |
+| AC-14.5 **[GATE]** | ✅ AI participants identify as AI when asked — prompt rule + turn instruction (6/6 live) + a guard that guarantees it; also asked aloud in voice mode (Day 5) | 100% |
 | AC-14.6 | ⬜ Floor grant → first audio p95 — **fails: 4.5 s** (median 3.2 s, n=12, Day 4) | ≤ 800 ms |
 | AC-14.7 | ⬜ Contribution metric vs human moderators (Spearman) | ≥ 0.6 |
 | AC-14.8 | ⬜ Improvement over speaking-time baseline | reported (the Paper 5 result) |
@@ -270,15 +311,15 @@ difference between a demo and a product.
 | EC | | Expected behaviour |
 |---|---|---|
 | EC-14.1 | ✅ Student says nothing the entire session — the moderator invites them by name in the opening and after 40 s of silence; the debrief is the moments someone turned to them, kindly worded, narrative included (Days 2–3, checked live) | Opening round guarantees ≥1 utterance; debrief focuses entirely on entry moments; **tone must be encouraging, not disappointed** |
-| EC-14.2 | ✅ Student dominates completely (70% floor) — the moderator hands the floor to the quietest persona, twice at most (Day 2) | Moderator intervenes twice with a redirect ("Kavya, what do you think?"); debrief shows uptake data |
+| EC-14.2 | ✅ Student dominates completely (70% floor) — the moderator hands the floor to the quietest persona, twice at most (Day 2); live on Day 5: "Thanks, Asha. Arjun, what's your take…" | Moderator intervenes twice with a redirect ("Kavya, what do you think?"); debrief shows uptake data |
 | EC-14.3 | ⬜ Two humans always talk over each other | Moderator intervenes; overlap stats surfaced to both |
 | EC-14.4 | ✅ All AI agents converge despite mitigations — repetition block forces yields; three in a row bring the moderator's curveball (Day 2) | Repetition block forces yields; if 3 consecutive yields, the moderator injects a curveball |
 | EC-14.5 | ⬜ Human drops mid-session | Seat held 60 s; moderator notes and continues; their partial score is computed |
 | EC-14.6 | ⬜ Only 1 human joins a friends-room | Auto-converts to hybrid with AI fillers, with consent ("nobody else joined — want me to fill the seats?") |
-| EC-14.7 | ⬜ Topic is unfamiliar to everyone | Moderator provides a 20-second framing; unfamiliarity is not penalised |
-| EC-14.8 | ⬜ Student speaks in Hindi/mixed | Fully accepted; transcribed; scored on content, never on language |
-| EC-14.9 | ⬜ Inappropriate content from a human | Moderator intervenes; repeated → removed from the room; logged |
-| EC-14.10 | ⬜ Student uses raise-hand exclusively | Recorded as a distinct entry style; debrief gently notes that real GDs have no hand-raise and offers the entry drill |
+| EC-14.7 | 🟡 Topic is unfamiliar to everyone — the opening restates the topic and invites the student, but does not frame it (tried with quadratic voting, Day 5); unfamiliarity is not a scoring rule | Moderator provides a 20-second framing; unfamiliarity is not penalised |
+| EC-14.8 | ✅ Student speaks in Hindi/mixed — Whisper transcribed a Hindi–English turn exactly, the panel answered its point, and every evaluator is told never to score language, accent or switching (Day 5) | Fully accepted; transcribed; scored on content, never on language |
+| EC-14.9 | 🟡 Inappropriate content from a human — scored as disruptive conduct (Day 5); no moderator intervention, removal or log yet: the panel carried on as if nothing was said | Moderator intervenes; repeated → removed from the room; logged |
+| EC-14.10 | ⬜ Student uses raise-hand exclusively — hands are counted, but no debrief note; the live walk was confounded by the spent model allowance (Day 5) | Recorded as a distinct entry style; debrief gently notes that real GDs have no hand-raise and offers the entry drill |
 | EC-14.11 | ⬜ 8 participants (max) | AI agents drop to 0; scheduler handles humans-only; overlap will be higher and that's realistic |
 | EC-14.12 | ⬜ Network drops for one participant | SFU handles; on return, a 10-second catch-up summary |
 | EC-14.13 | ⬜ Discourse graph pass fails | Fall back to novelty-only scoring; uptake marked unavailable |
