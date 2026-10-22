@@ -72,6 +72,12 @@ LISTEN_WAIT_LIMIT_SECONDS = 4.0
 PLAYBACK_SLACK_SECONDS = 4.0
 # Utterances shorter than this are mic noise, not contributions.
 MIN_WORDS = 2
+# A persona line is ~45 words (~70 tokens); a tight cap keeps the reply quick.
+PERSONA_MAX_TOKENS = 120
+# Lines of the discussion each persona prompt carries: fewer input tokens, faster reply.
+HISTORY_LINES = 10
+# What a persona answers to stay quiet.
+SILENT = "[SILENT]"
 
 LINE_SCHEMA = {
     "type": "object",
@@ -129,6 +135,7 @@ class PracticeRoom:
         self.user_active = False
         self.burst: asyncio.Task | None = None
         self.idle: asyncio.Task | None = None
+        self.warming: asyncio.Task | None = None  # connection warm-up for the persona model
         self.opened = False
         self.stt_pending = 0  # utterances still being transcribed
         self.playback_done = asyncio.Event()  # the browser finished playing the line
@@ -142,6 +149,9 @@ class PracticeRoom:
             gd = await session_service.require_session(db, self.session_id)
             self.personas = {p["label"]: p for p in gd.personas}
             self._started_at_gd = gd
+            warm = getattr(get_persona_llm_provider(), "warm_up", None)
+            if warm is not None:
+                self.warming = asyncio.create_task(warm())
             return gd
 
     async def start_session(self, user) -> None:
@@ -337,7 +347,15 @@ class PracticeRoom:
 
     async def _burst(self, addressed: str | None = None, hold: float = 0.0) -> None:
         """A persona answers; sometimes another follows on, then the floor is the student's."""
+        early: asyncio.Task[Line] | None = None
         try:
+            # The first reply is generated while the student is still being heard out:
+            # the model call overlaps the listen pause instead of following it. If the
+            # student carries on, the early line is dropped unused.
+            when = await self._timing()
+            first = self._choose(addressed, bool(when and when.converging))
+            if first and when and when.phase != clock.OVER and not self.user_active:
+                early = asyncio.create_task(self._generate(self.personas[first], when))
             if not await self._listen(hold):
                 return  # the student is still speaking; their next utterance re-triggers us
             for turn in range(MAX_CHAIN):
@@ -346,10 +364,13 @@ class PracticeRoom:
                     return
                 if self.concluded and when.converging:
                     return  # the discussion has been wrapped up: say nothing more
-                label = self._choose(addressed if turn == 0 else None, when.converging)
+                if turn == 0 and first:
+                    label, ready, early = first, early, None
+                else:
+                    label, ready = self._choose(None, when.converging), None
                 if label is None or self.user_active:
                     return
-                cut = await self._persona_turn(label)
+                cut = await self._persona_turn(label, ready)
                 if cut or self.user_active or self.concluded or random.random() > CHAIN_PROBABILITY:
                     return
                 await asyncio.sleep(0.6)
@@ -357,6 +378,9 @@ class PracticeRoom:
             raise
         except Exception:
             logger.exception("persona burst failed", extra={"session_id": self.sid})
+        finally:
+            if early and not early.done():
+                early.cancel()
 
     async def _idle_loop(self) -> None:
         """Open the discussion, then nudge the student when the room goes quiet."""
@@ -420,23 +444,42 @@ class PracticeRoom:
             "view. Stay aware of the clock: you may mention time naturally (for example 'we are "
             "running short') but never contradict it.\n\n"
             + clock.guidance(when, self.concluded)
-            + '\n\nReturn JSON: {"speak": <bool>, "is_conclusion": <bool>, '
-            '"text": "<what you say next>"}.'
+            + f"\n\nReply with ONLY the words you say aloud. To stay silent, reply {SILENT}."
         )
-        result = await get_persona_llm_provider().complete_json(
-            system=system,
-            prompt=f"Discussion so far:\n{history}\n\nWhat do you say next?",
-            schema=LINE_SCHEMA,
-            max_tokens=150,
+        prompt = f"Discussion so far:\n{history}\n\nWhat do you say next?"
+        provider = get_persona_llm_provider()
+        began = time.monotonic()
+        complete_text = getattr(provider, "complete_text", None)
+        if complete_text is not None:
+            result = await complete_text(
+                system=system, prompt=prompt, max_tokens=PERSONA_MAX_TOKENS
+            )
+            text = result.raw_text.strip().strip('"')
+            silent = not text or SILENT in text.upper()
+            is_conclusion = not silent and clock.looks_like_conclusion(text)
+        else:
+            result = await provider.complete_json(
+                system=system + '\n\nReturn JSON: {"speak": <bool>, "is_conclusion": <bool>, '
+                '"text": "<what you say next>"}.',
+                prompt=prompt,
+                schema=LINE_SCHEMA,
+                max_tokens=150,
+            )
+            text = str(result.data.get("text", "")).strip().strip('"')
+            silent = not bool(result.data.get("speak", True)) or not text
+            is_conclusion = bool(result.data.get("is_conclusion", False))
+        logger.info(
+            "persona line generated",
+            extra={
+                "session_id": self.sid,
+                "model": result.model,
+                "seconds": round(time.monotonic() - began, 2),
+                "tokens": result.output_tokens,
+            },
         )
-        text = str(result.data.get("text", "")).strip().strip('"')
-        return Line(
-            speak=bool(result.data.get("speak", True)) and bool(text),
-            text=text,
-            is_conclusion=bool(result.data.get("is_conclusion", False)),
-        )
+        return Line(speak=not silent, text=text, is_conclusion=is_conclusion)
 
-    async def _persona_turn(self, label: str) -> bool:
+    async def _persona_turn(self, label: str, ready: "asyncio.Task[Line] | None" = None) -> bool:
         """One persona speaks. Returns True if the student cut them off.
 
         Two stages: the line is generated and streamed to the browser (`speaking`;
@@ -449,7 +492,7 @@ class PracticeRoom:
         if when is None or when.phase == clock.OVER:
             return False
         try:
-            line = await self._generate(persona, when)
+            line = await (ready if ready else self._generate(persona, when))
         except LLMError as exc:
             logger.warning("persona turn failed", extra={"session_id": self.sid, "error": str(exc)})
             return False

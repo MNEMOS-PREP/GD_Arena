@@ -23,6 +23,11 @@ from services.llm.base import LLMError, LLMResult, ToolDefinition, ToolInvocatio
 
 logger = logging.getLogger(__name__)
 
+#: Per-attempt limit for a spoken line (`complete_text`); one retry follows.
+TEXT_TIMEOUT_SECONDS = 6.0
+#: A second identical call is sent if the first has not answered by then.
+HEDGE_AFTER_SECONDS = 1.5
+
 
 class OpenAIProvider:
     """Async OpenAI client behind the `LLMProvider` protocol."""
@@ -36,11 +41,13 @@ class OpenAIProvider:
         *,
         timeout: float | None = None,
         max_retries: int | None = None,
+        base_url: str | None = None,
     ) -> None:
         self.model = model or settings.llm_model
         self._api_key = api_key or settings.llm_api_key or settings.openai_api_key or None
         self._timeout = timeout if timeout is not None else settings.llm_timeout_seconds
         self._max_retries = max_retries if max_retries is not None else settings.llm_max_retries
+        self._base_url = base_url if base_url is not None else settings.openai_base_url
         self._client = None
 
     def _get_client(self):
@@ -56,8 +63,85 @@ class OpenAIProvider:
             kwargs: dict[str, Any] = {"timeout": self._timeout, "max_retries": 0}
             if self._api_key:
                 kwargs["api_key"] = self._api_key
+            if self._base_url:
+                kwargs["base_url"] = self._base_url
             self._client = AsyncOpenAI(**kwargs)
         return self._client
+
+    async def warm_up(self) -> None:
+        """Open the HTTPS connection ahead of the first spoken line (best effort)."""
+        try:
+            await self._get_client().models.list()
+        except Exception:  # noqa: BLE001 - only a head start, never a failure
+            logger.info("llm warm-up skipped")
+
+    async def complete_text(
+        self,
+        *,
+        system: str,
+        prompt: str,
+        max_tokens: int = 120,
+    ) -> LLMResult:
+        """Plain spoken text, no JSON wrapper: the fast path for a persona's line.
+
+        No schema to follow and no retry loop: one short request, so the first
+        token comes back as soon as the model can produce it. A failure raises
+        `LLMError` at once; the caller skips that turn rather than hold the table.
+        """
+        client = self._get_client()
+
+        def request():
+            return asyncio.ensure_future(
+                client.chat.completions.create(
+                    model=self.model,
+                    max_completion_tokens=max_tokens,
+                    temperature=0.8,
+                    # A line is ~70 tokens: a call slower than this is stuck, not busy.
+                    timeout=TEXT_TIMEOUT_SECONDS,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+            )
+
+        # Hedged: free tiers answer in ~0.4 s but now and then stall for seconds. If
+        # the first call has not answered after HEDGE_AFTER_SECONDS an identical one
+        # races it and the first to finish wins. A call that fails outright is
+        # replaced the same way, so a dropped connection costs no extra wait.
+        pending = {request()}
+        hedged = False
+        response = None
+        error: Exception | None = None
+        while pending and response is None:
+            done, pending = await asyncio.wait(
+                pending,
+                timeout=None if hedged else HEDGE_AFTER_SECONDS,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in done:
+                if task.exception() is None:
+                    response = task.result()
+                    break
+                error = task.exception()
+            if response is None and (not done or (error and not hedged)):
+                hedged = True
+                pending.add(request())
+        for task in pending:
+            task.cancel()
+        if response is None:
+            raise LLMError(f"openai request failed: {error}") from error
+        choice = response.choices[0]
+        text = (choice.message.content or "").strip()
+        usage = response.usage
+        return LLMResult(
+            data={"text": text},
+            model=response.model,
+            input_tokens=usage.prompt_tokens if usage else 0,
+            output_tokens=usage.completion_tokens if usage else 0,
+            raw_text=text,
+            metadata={"finish_reason": choice.finish_reason},
+        )
 
     async def complete_json(
         self,

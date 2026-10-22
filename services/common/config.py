@@ -90,6 +90,11 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     # Faster model for the practice personas' short spoken lines (empty = LLM_MODEL).
     persona_llm_model: str = ""
+    # Any OpenAI-compatible endpoint (Gemini, Groq, ...). The personas may use a
+    # different vendor from evaluation: empty = the main endpoint and key.
+    openai_base_url: str = ""
+    persona_llm_base_url: str = ""
+    persona_llm_api_key: str = ""
     llm_max_tokens: int = 2048
     llm_timeout_seconds: float = 60.0
     llm_max_retries: int = 3

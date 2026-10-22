@@ -61,13 +61,22 @@ def get_persona_llm_provider() -> LLMProvider:
     global _persona_provider
     base = get_llm_provider()
     model = settings.persona_llm_model.strip()
-    if not model or base.name not in {"openai", "anthropic"} or base.model == model:
+    url = settings.persona_llm_base_url.strip()
+    if not model or base.name not in {"openai", "anthropic"}:
+        return base
+    if base.model == model and not url:
         return base
     if _persona_provider is None or _persona_provider.model != model:
         if base.name == "openai":
             from services.llm.openai_provider import OpenAIProvider
 
-            _persona_provider = OpenAIProvider(model=model)
+            # A persona vendor of its own (e.g. Groq's llama-3.1-8b-instant) when a base
+            # URL is set; otherwise the main endpoint and key.
+            _persona_provider = OpenAIProvider(
+                model=model,
+                api_key=settings.persona_llm_api_key.strip() or None,
+                base_url=url or None,
+            )
         else:
             from services.llm.anthropic_provider import AnthropicProvider
 
