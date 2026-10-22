@@ -36,3 +36,6 @@ Thumbs.db
 
 # Local SQLite database (no-Docker mode)
 *.db
+
+backend.out.log
+backend.err.log
