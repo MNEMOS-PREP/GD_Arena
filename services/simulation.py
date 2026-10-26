@@ -255,6 +255,17 @@ def _cut(text: str, fraction: float) -> str:
     return " ".join(words[:kept]).rstrip(",;:") + " —"
 
 
+#: Fire-and-forget tasks, held until done: the loop keeps only a weak reference to a
+#: task, so one nobody holds can be collected mid-sleep and its speaker stays lit.
+_BACKGROUND: set[asyncio.Task] = set()
+
+
+def _spawn(coro) -> None:
+    task = asyncio.create_task(coro)
+    _BACKGROUND.add(task)
+    task.add_done_callback(_BACKGROUND.discard)
+
+
 async def _stop_later(session_id: uuid.UUID, label: str, delay: float) -> None:
     await asyncio.sleep(delay)
     await _broadcast(session_id, ServerEvent.SPEECH_STOPPED, {"candidate_label": label})
@@ -406,7 +417,7 @@ async def _run(factory: async_sessionmaker[AsyncSession], session_id: uuid.UUID)
                 # moment later. The next loop turn records the interrupter.
                 reply_turn = _Turn(other, reply, _duration_of(reply, reply_spoken), reply_spoken)
                 pending = (reply_turn, start + cut_after)
-                asyncio.create_task(_stop_later(session_id, agent.label, end - start))
+                _spawn(_stop_later(session_id, agent.label, end - start))
                 await asyncio.sleep(cut_after)
                 continue
             # While this line is spoken, write and voice the next one, so the pause

@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     # Faster model for the practice personas' short spoken lines (empty = LLM_MODEL).
     persona_llm_model: str = ""
+    # The personas may live on a vendor of their own (abhinav, arena-fast): empty = the
+    # main endpoint and key.
+    persona_llm_base_url: str = ""
+    persona_llm_api_key: str = ""
     # Reasoning effort for models that think before answering (gpt-oss on Groq).
     # Without it they spend the whole token cap thinking and return nothing, so a
     # 150-token persona line comes back empty. low | medium | high.

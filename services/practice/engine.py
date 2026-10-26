@@ -117,6 +117,17 @@ SendJson = Callable[[dict], Awaitable[None]]
 SendBytes = Callable[[bytes], Awaitable[None]]
 
 
+def _discard(task: asyncio.Task | None) -> None:
+    """Cancel a task nobody will await; a failure it already had is read, so it
+    is not reported as never retrieved."""
+    if task is None:
+        return
+    if not task.done():
+        task.cancel()
+    elif not task.cancelled():
+        task.exception()
+
+
 class PracticeRoom:
     def __init__(
         self,
@@ -154,6 +165,7 @@ class PracticeRoom:
         self.user_active = False
         self.burst: asyncio.Task | None = None
         self.idle: asyncio.Task | None = None
+        self.warming: asyncio.Task | None = None  # the persona model's connection, opened early
         self.opened = False
         self.stt_pending = 0  # utterances still being transcribed
         self.playback_done = asyncio.Event()  # the browser finished playing the line
@@ -186,7 +198,10 @@ class PracticeRoom:
             self.personas = {p["label"]: p for p in gd.personas}
             self.moderator = panel.pick_moderator(self.personas)
             self._started_at_gd = gd
-            return gd
+        warm = getattr(get_persona_llm_provider(), "warm_up", None)
+        if warm is not None and self.warming is None:
+            self.warming = asyncio.create_task(warm(), name=f"practice-warm-{self.sid}")
+        return gd
 
     async def start_session(self, user) -> None:
         """Student pressed start: ready up and begin preparation."""
@@ -210,7 +225,9 @@ class PracticeRoom:
             self.idle = asyncio.create_task(self._idle_loop(), name=f"practice-idle-{self.sid}")
 
     async def close(self) -> None:
-        tasks = [t for t in (self.burst, self.idle, *self._tasks) if t and not t.done()]
+        tasks = [
+            t for t in (self.burst, self.idle, self.warming, *self._tasks) if t and not t.done()
+        ]
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -510,15 +527,34 @@ class PracticeRoom:
     async def _burst(
         self, addressed: str | None = None, hold: float = 0.0, opening: bool = False
     ) -> None:
-        """A persona answers; sometimes another follows on, then the floor is the student's."""
+        """A persona answers; sometimes another follows on, then the floor is the student's.
+
+        The first reply is written while the student is still being heard out
+        (abhinav, arena-fast): the model call overlaps the listen pause instead of
+        following it. If the student carries on, that line is dropped unused, and
+        a turn it took from `forced` (a raised hand, a redirect) is owed again.
+        """
+        owed = self.forced
+        first: tuple[str | None, str | None, str] | None = None
+        early: asyncio.Task[Line] | None = None
         try:
+            when = await self._timing()
+            if when is not None and when.phase != clock.OVER:
+                first = self._first_turn(addressed, opening, when)
+                if first[0] is not None and not self.user_active:
+                    early = asyncio.create_task(
+                        self._generate(self.personas[first[0]], when, first[1], first[2]),
+                        name=f"practice-early-{self.sid}",
+                    )
             if not await self._listen(hold):
+                self._give_back(first, owed)
                 return  # the student is still speaking; their next utterance re-triggers us
             for _ in range(CUT_LINE_WAIT_STEPS):
                 if not self.speaking:
                     break
                 await asyncio.sleep(0.1)  # a line the student cut is still unwinding
             if self.speaking:
+                self._give_back(first, owed)
                 return
             for turn in range(MAX_CHAIN):
                 when = await self._timing()
@@ -526,16 +562,16 @@ class PracticeRoom:
                     return
                 if self.concluded and when.converging:
                     return  # the discussion has been wrapped up: say nothing more
-                if opening and turn == 0 and self.moderator:
-                    # FR-14.3 / EC-14.1: the moderator opens and invites the student.
-                    label, cue, target = self.moderator, "open", ""
+                ready = None
+                if turn == 0 and first is not None:
+                    (label, cue, target), ready = first, early
+                elif turn == 0:
+                    label, cue, target = self._first_turn(addressed, opening, when)
                 else:
-                    label, cue, target = self._choose(
-                        addressed if turn == 0 else None, when.converging
-                    )
+                    label, cue, target = self._choose(None, when.converging)
                 if label is None or self.user_active:
                     return
-                cut = await self._persona_turn(label, cue, target)
+                cut = await self._persona_turn(label, cue, target, ready)
                 if cue in ("open", "hand") or cut or self.user_active or self.concluded:
                     return  # after an invitation the floor is the student's
                 if self.forced:
@@ -547,6 +583,23 @@ class PracticeRoom:
             raise
         except Exception:
             logger.exception("persona burst failed", extra={"session_id": self.sid})
+        finally:
+            _discard(early)
+
+    def _first_turn(
+        self, addressed: str | None, opening: bool, when: clock.Timing
+    ) -> tuple[str | None, str | None, str]:
+        """Who answers first: at the opening the moderator, who opens and invites
+        the student (FR-14.3 / EC-14.1); else as `_choose` says."""
+        if opening and self.moderator:
+            return self.moderator, "open", ""
+        return self._choose(addressed, when.converging)
+
+    def _give_back(self, first: tuple | None, owed: tuple | None) -> None:
+        """A burst dropped before it spoke returns the turn it took: a raised hand
+        or a redirect is still owed, not lost to a student who kept talking."""
+        if owed is not None and first == owed and self.forced is None:
+            self.forced = owed
 
     async def _idle_loop(self) -> None:
         """Open the discussion, then nudge the student when the room goes quiet."""
@@ -615,6 +668,10 @@ class PracticeRoom:
         async with self.factory() as db:
             gd = await session_service.require_session(db, self.session_id)
             topic = gd.topic
+        provider = get_persona_llm_provider()
+        # The plain-text path where the provider has one (abhinav, arena-fast): no
+        # JSON to wrap the words in, so the line comes back as soon as it is said.
+        complete_text = getattr(provider, "complete_text", None)
         system = panel.persona_system(
             persona,
             student=self.student_name,
@@ -628,24 +685,52 @@ class PracticeRoom:
             target=self.personas[target]["name"] if target in self.personas else target,
             repeated=repeated,
             asked_ai=bool(self.ai_question),
+            reply="text" if complete_text is not None else "json",
         )
-        result = await get_persona_llm_provider().complete_json(
-            system=system,
-            prompt=f"Discussion so far:\n{history}\n\nWhat do you say next?",
-            schema=LINE_SCHEMA,
-            # The prompt caps the words; this caps tokens. A reasoning model spends
-            # some before it answers, and at 150 a long prompt left too few for the
-            # JSON (Groq: json_validate_failed, a student's turn went unanswered).
-            max_tokens=PERSONA_MAX_TOKENS,
+        prompt = f"Discussion so far:\n{history}\n\nWhat do you say next?"
+        began = time.monotonic()
+        # The prompt caps the words; this caps tokens. A reasoning model spends
+        # some before it answers, and at 150 a long prompt left too few for the
+        # JSON (Groq: json_validate_failed, a student's turn went unanswered).
+        if complete_text is not None:
+            result = await complete_text(
+                system=system, prompt=prompt, max_tokens=PERSONA_MAX_TOKENS
+            )
+            text = result.raw_text.strip().strip('"')
+            silent = not text or panel.SILENT in text.upper()
+            line = Line(
+                speak=not silent,
+                text="" if silent else text,
+                is_conclusion=not silent and clock.looks_like_conclusion(text),
+            )
+        else:
+            result = await provider.complete_json(
+                system=system, prompt=prompt, schema=LINE_SCHEMA, max_tokens=PERSONA_MAX_TOKENS
+            )
+            text = str(result.data.get("text", "")).strip().strip('"')
+            line = Line(
+                speak=bool(result.data.get("speak", True)) and bool(text),
+                text=text,
+                is_conclusion=bool(result.data.get("is_conclusion", False)),
+            )
+        logger.info(
+            "persona line generated",
+            extra={
+                "session_id": self.sid,
+                "model": result.model,
+                "seconds": round(time.monotonic() - began, 2),
+                "tokens": result.output_tokens,
+            },
         )
-        text = str(result.data.get("text", "")).strip().strip('"')
-        return Line(
-            speak=bool(result.data.get("speak", True)) and bool(text),
-            text=text,
-            is_conclusion=bool(result.data.get("is_conclusion", False)),
-        )
+        return line
 
-    async def _persona_turn(self, label: str, cue: str | None = None, target: str = "") -> bool:
+    async def _persona_turn(
+        self,
+        label: str,
+        cue: str | None = None,
+        target: str = "",
+        ready: "asyncio.Task[Line] | None" = None,
+    ) -> bool:
         """One persona speaks. Returns True if the student cut them off.
 
         Two stages: the line is generated and streamed to the browser (`speaking`;
@@ -654,14 +739,18 @@ class PracticeRoom:
         an interruption - talking over a persona who has not started yet does not.
 
         `cue` is a special task for this turn (panel.cue_text): opening, inviting the
-        student, a redirect to `target`, a curveball, the close.
+        student, a redirect to `target`, a curveball, the close. `ready`: the line,
+        already being written while the student was heard out (`_burst`).
         """
         persona = self.personas[label]
         when = await self._timing()
         if when is None or when.phase == clock.OVER:
             return False
         try:
-            line = await self._generate(persona, when, cue, target)
+            if ready is not None:
+                line = await ready
+            else:
+                line = await self._generate(persona, when, cue, target)
             if line.speak and cue is None:
                 # FR-14.5: a line that restates a recent point goes back once; restated
                 # again, the persona yields, and three yields bring a curveball (EC-14.4).

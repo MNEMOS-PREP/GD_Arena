@@ -41,6 +41,11 @@ _COOLING_UNTIL: dict[str, float] = {}
 #: fails at once with `QuotaExhausted` instead of sleeping through it.
 LONG_WAIT_SECONDS = 90.0
 
+#: Per-attempt limit for a spoken line (`complete_text`).
+TEXT_TIMEOUT_SECONDS = 6.0
+#: A second identical call races the first if it has not answered by then.
+HEDGE_AFTER_SECONDS = 1.5
+
 
 async def _model_with_headroom(models: list[str]) -> str:
     """The first model not cooling; if all are, wait for the soonest to reopen."""
@@ -78,11 +83,14 @@ class OpenAIProvider:
         *,
         timeout: float | None = None,
         max_retries: int | None = None,
+        base_url: str | None = None,
     ) -> None:
         self.model = model or settings.llm_model
         self._api_key = api_key or settings.llm_api_key or settings.openai_api_key or None
         self._timeout = timeout if timeout is not None else settings.llm_timeout_seconds
         self._max_retries = max_retries if max_retries is not None else settings.llm_max_retries
+        # This provider's own endpoint: the personas may live on another vendor's.
+        self._base_url = base_url if base_url is not None else settings.openai_base_url
         self._client = None
         limit = settings.llm_max_concurrency
         self._slots = asyncio.Semaphore(limit) if limit > 0 else None
@@ -182,10 +190,92 @@ class OpenAIProvider:
             kwargs: dict[str, Any] = {"timeout": self._timeout, "max_retries": 0}
             if self._api_key:
                 kwargs["api_key"] = self._api_key
-            if settings.openai_base_url:
-                kwargs["base_url"] = settings.openai_base_url
+            if self._base_url:
+                kwargs["base_url"] = self._base_url
             self._client = AsyncOpenAI(**kwargs)
         return self._client
+
+    async def warm_up(self) -> None:
+        """Open the HTTPS connection ahead of the first spoken line (best effort)."""
+        try:
+            await self._get_client().models.list()
+        except Exception:  # noqa: BLE001 - only a head start, never a failure
+            logger.info("llm warm-up skipped")
+
+    async def complete_text(
+        self,
+        *,
+        system: str,
+        prompt: str,
+        max_tokens: int,
+    ) -> LLMResult:
+        """Plain spoken text, no JSON wrapper: the fast path for a persona's line
+        (abhinav, arena-fast).
+
+        Hedged: free tiers answer in ~0.4 s but now and then stall for seconds. If
+        the first call has not answered after HEDGE_AFTER_SECONDS an identical one
+        races it and the first to finish wins; a call that fails outright is
+        replaced the same way, once. Each goes through `_create`, so a model
+        cooling after a 429 is skipped and the concurrency cap holds. Out of
+        allowance raises `QuotaExhausted` as it is — the room says so — and
+        whatever is still in flight is cancelled on every way out, a caller's
+        cancellation included: a stalled request left running spends the same
+        per-minute tokens the next line needs.
+        """
+        client = self._get_client()
+
+        def request() -> asyncio.Task:
+            return asyncio.ensure_future(
+                self._create(
+                    client,
+                    model=self.model,
+                    max_completion_tokens=max_tokens,
+                    # A line is ~70 tokens: a call slower than this is stuck, not busy.
+                    timeout=TEXT_TIMEOUT_SECONDS,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+            )
+
+        pending = {request()}
+        hedged = False
+        response = None
+        error: BaseException | None = None
+        try:
+            while pending and response is None:
+                done, pending = await asyncio.wait(
+                    pending,
+                    timeout=None if hedged else HEDGE_AFTER_SECONDS,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in done:
+                    if task.exception() is None:
+                        response = task.result()
+                        break
+                    error = task.exception()
+                    if isinstance(error, QuotaExhausted):
+                        raise error
+                if response is None and not hedged and (not done or error is not None):
+                    hedged = True
+                    pending.add(request())
+        finally:
+            for task in pending:
+                task.cancel()
+        if response is None:
+            raise LLMError(f"openai request failed: {error}") from error
+        choice = response.choices[0]
+        text = (choice.message.content or "").strip()
+        usage = response.usage
+        return LLMResult(
+            data={"text": text},
+            model=response.model,
+            input_tokens=usage.prompt_tokens if usage else 0,
+            output_tokens=usage.completion_tokens if usage else 0,
+            raw_text=text,
+            metadata={"finish_reason": choice.finish_reason, "hedged": hedged},
+        )
 
     async def complete_json(
         self,
@@ -290,7 +380,7 @@ class OpenAIProvider:
         is done it returns content matching the schema.
         """
         client = self._get_client()
-        if settings.openai_base_url:
+        if self._base_url:
             # Other OpenAI-compatible vendors (e.g. Groq) reject response_format together
             # with tools, so the schema goes in the prompt; the contract gate still validates.
             system = (
@@ -325,7 +415,7 @@ class OpenAIProvider:
                     "messages": messages,
                     "tools": tool_specs,
                 }
-                if not settings.openai_base_url:
+                if not self._base_url:
                     request["response_format"] = {
                         "type": "json_schema",
                         "json_schema": {

@@ -100,6 +100,8 @@ DOMINANT_SHARE = 0.70
 MAX_REDIRECTS = 2
 #: Repetitions in a row before the moderator throws in a curveball (EC-14.4).
 YIELDS_BEFORE_CURVEBALL = 3
+#: What a persona replies to stay quiet, on the plain-text path (`reply="text"`).
+SILENT = "[SILENT]"
 
 _STOPWORDS = frozenset(
     """a an the and or but if so to of in on at for with by from as is are was were be
@@ -259,8 +261,13 @@ def persona_system(
     repeated: str = "",
     asked_ai: bool = False,
     named: bool = True,
+    reply: str = "json",
 ) -> str:
     """The whole system prompt for one persona line.
+
+    `reply`: "json" asks for the {speak, is_conclusion, text} object; "text" for
+    the spoken words alone, or SILENT to stay quiet (the provider's plain-text
+    fast path, `complete_text`).
 
     `asked_ai`: the student's last line asked whether we are an AI. Measured
     against Groq on 2026-10-17, the standing rule alone got an admission 2 times
@@ -311,9 +318,13 @@ def persona_system(
         )
     if instruction := cue_text(cue, student=student, target=target, repeated=repeated, named=named):
         parts.append(instruction)
-    parts.append(
-        'Return JSON: {"speak": <bool>, "is_conclusion": <bool>, "text": "<what you say next>"}.'
-    )
+    if reply == "text":
+        parts.append(f"Reply with ONLY the words you say aloud. To stay silent, reply {SILENT}.")
+    else:
+        parts.append(
+            'Return JSON: {"speak": <bool>, "is_conclusion": <bool>, '
+            '"text": "<what you say next>"}.'
+        )
     return "\n\n".join(parts)
 
 
