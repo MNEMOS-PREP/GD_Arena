@@ -21,6 +21,30 @@ Legend: ✅ done · 🟡 partly done · ⬜ not started
 
 ---
 
+### 2026-10-26 — abhinav's `arena-fast`, ported onto the panel (`7c67df4`, merge `da4f7dc`)
+
+`arena-fast` (054a43f, 1b3eec1, 22 Oct) was cut on 7 Oct, before the panel, the
+per-model cooldowns and the out-of-allowance notice; merged as it was it
+conflicted in five files and would have undone them. Ported onto `wrap-up`:
+
+- ✅ **A persona vendor of its own:** `PERSONA_LLM_BASE_URL`,
+  `PERSONA_LLM_API_KEY` (e.g. Gemini evaluating, Groq voicing). Each provider
+  reads its own endpoint, and the vendor quirks follow it.
+- ✅ **A hedged plain-text line** (`complete_text`): a second identical call
+  races a first that has not answered in 1.5 s; through `_create`, so cooling
+  models are skipped and `LLM_MAX_CONCURRENCY` holds. Two defects the branch had,
+  fixed in the port: out of allowance became an ordinary failure (the room went
+  silent instead of saying so), and a dropped line left its stalled requests
+  running, spending the tokens the next one needed.
+- 🟡 **FR-14.8, in part:** the first reply is written during the listen pause,
+  not after it. The branch lost a raised hand or redirect when the student kept
+  talking (`forced` consumed by an early choice); it is owed again now.
+- ✅ The persona model's connection is opened when the room loads.
+- ✅ Bug sweep: the agents' "stopped speaking" task had no reference held, so
+  the loop could collect it mid-sleep and leave a speaker lit.
+- ⬜ **AC-14.6 not re-measured** with the port (floor grant → first audio was
+  p95 4.5 s). Play-on-first-chunk is still the other half. 496 tests.
+
 ### 2026-10-17 — the plan: wrap GD by Wed 21 Oct
 
 All wrap-up work lands on branch **`wrap-up`** (cut from `groq-edge-tts`, which
