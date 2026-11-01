@@ -126,8 +126,13 @@ export default function NewPracticePage() {
   const ready = !busy && chosen.length > 0 && topic.trim().length >= 5 && (format !== "case" || caseBrief.trim().length >= 20);
 
   return (
+    <>
+    <header className="gdset-welcome">
+      <p className="gdset-kicker">YOUR PRACTICE SPACE</p>
+      <h1>A little practice today?</h1>
+      <p>Choose your round and your pace. We&rsquo;ll bring a panel that listens — and a plan that fits.</p>
+    </header>
     <form className="gdset" onSubmit={submit}>
-      <h1 className="gdset-sr">Practice with AI personas</h1>
 
       <div className="gdset-main">
         <div className="gdset-card">
@@ -345,5 +350,6 @@ export default function NewPracticePage() {
         </p>
       </aside>
     </form>
+    </>
   );
 }
