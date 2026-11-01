@@ -115,7 +115,7 @@ export default function PracticeRoomPage() {
         }
       />
 
-      <div>
+      <div className="arena-stage">
         <RoundTable
           seats={seats}
           centre={
