@@ -23,6 +23,7 @@ import {
   FloorBars,
   hueFor,
   IdeasStrip,
+  MeetButton,
   Notices,
   RoundTable,
   type SeatInfo,
@@ -154,6 +155,7 @@ export default function RoomPage() {
       you: participant.candidate_label === socket.you,
       badge: isAI ? "AI" : undefined,
       speaking,
+      muted: participant.candidate_label === socket.you ? !media.micEnabled : undefined,
       strikes: socket.penalties[participant.candidate_label]?.interruptions,
       away: participant.state === "DISCONNECTED",
       sub: participant.state === "DISCONNECTED" ? "away" : "listening",
@@ -196,6 +198,7 @@ export default function RoomPage() {
         <div className="room-main">
           <RoundTable
             seats={seats}
+            selfVideo={!observing ? { on: media.cameraEnabled, videoRef: media.localVideoRef } : undefined}
             centre={
               latest ? (
                 <>
@@ -230,26 +233,9 @@ export default function RoomPage() {
             </div>
           )}
 
-          {hasVideo && (
-            <div className="video-strip">
-              {!observing && (
-                <div className="video-self">
-                  <video
-                    ref={media.localVideoRef}
-                    className="remote-video"
-                    autoPlay
-                    muted
-                    playsInline
-                    style={{ transform: "scaleX(-1)", opacity: media.cameraEnabled ? 1 : 0.15 }}
-                  />
-                  <span className="meta">You{media.micEnabled ? "" : " (muted)"}</span>
-                </div>
-              )}
-              <div id="remote-media" className="video-remote" />
-            </div>
-          )}
+          <div id="remote-media" className="video-remote" hidden />
 
-          <div className="controls">
+          <div className="meet-bar">
             {!observing && hasVideo && (
               <>
                 <ControlButton
@@ -411,21 +397,8 @@ function ControlButton({
   title?: string;
   onClick: () => void;
 }) {
-  return (
-    <button
-      type="button"
-      className="ctl-round"
-      aria-pressed={pressed}
-      disabled={disabled}
-      title={title}
-      onClick={onClick}
-    >
-      <span className="ctl-ico">
-        <Icon name={icon} size={22} />
-      </span>
-      <span className="ctl-label">{label}</span>
-    </button>
-  );
+  const warn = icon === "mic" || icon === "mic-off" || icon === "video" || icon === "video-off";
+  return <MeetButton warn={warn} icon={icon} label={label} on={pressed} disabled={disabled} title={title} onClick={onClick} />;
 }
 
 /** Private notes for this discussion, kept in the browser and never sent anywhere. */
