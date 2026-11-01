@@ -7,6 +7,7 @@ import "./immersive.css";
 import "./refresh.css";
 import "./refresh2.css";
 import "./refresh3.css";
+import "./figma.css";
 
 export const metadata: Metadata = {
   title: "GD Platform",
