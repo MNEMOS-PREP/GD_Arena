@@ -7,10 +7,13 @@ import "./immersive.css";
 import "./refresh.css";
 import "./refresh2.css";
 import "./refresh3.css";
+import "./figma.css";
+import "./gdset.css";
 
 export const metadata: Metadata = {
   title: "GD Platform",
   description: "Group Discussion platform with agentic AI evaluation — local development",
+  icons: { icon: "/favicon.png" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

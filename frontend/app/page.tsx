@@ -128,6 +128,7 @@ export default function HomePage() {
   return (
     <div className="stack fade-in" style={{ gap: "1.5rem" }}>
       <header className="page-head">
+        <p className="gdset-kicker">YOUR PRACTICE SPACE</p>
         <h1>
           {greeting}, {user.full_name.split(" ")[0]}
         </h1>

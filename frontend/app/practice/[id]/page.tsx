@@ -12,8 +12,10 @@ import {
   ArenaHeader,
   FloorBars,
   IdeasStrip,
+  MeetButton,
   Notices,
   RoundTable,
+  useSelfCamera,
   type SeatInfo,
 } from "@/app/immersive/parts";
 import { ApiError, sessions } from "@/lib/api";
@@ -31,6 +33,7 @@ export default function PracticeRoomPage() {
   const [ending, setEnding] = useState(false);
   const [draft, setDraft] = useState("");
   const [handUp, setHandUp] = useState(false);
+  const camera = useSelfCamera();
 
   // A raised hand shows as raised until the moderator has had a moment to invite.
   useEffect(() => {
@@ -60,6 +63,7 @@ export default function PracticeRoomPage() {
       name: nameOf("A"),
       you: true,
       speaking: room.speaking.includes("A"),
+      muted: room.muted || room.typing,
       level: room.micLevel,
       strikes: room.penalties["A"]?.interruptions,
       sub: room.typing ? "typing" : room.muted ? "muted" : room.listening ? "listening" : "mic off",
@@ -115,12 +119,13 @@ export default function PracticeRoomPage() {
         }
       />
 
-      <div>
+      <div className="arena-stage">
         <RoundTable
           seats={seats}
+          selfVideo={{ on: camera.on, stream: camera.stream }}
           centre={
             notStarted ? (
-              <p>Put on headphones, then start when you are ready.</p>
+              <p>Put on headphones, then join when you are ready. Turn your camera on if you like: it stays on your device.</p>
             ) : preparing ? (
               <p>Preparation. The personas will open the discussion when the clock starts.</p>
             ) : last ? (
@@ -141,9 +146,9 @@ export default function PracticeRoomPage() {
         {(live || Object.keys(room.floor).length > 0) && (
           <FloorBars floor={room.floor} order={order} nameOf={nameOf} />
         )}
-        {(error || room.error || room.micError) && (
+        {(error || room.error || room.micError || camera.error) && (
           <div className="alert alert--error" style={{ margin: "0 auto" }}>
-            {error ?? room.micError ?? room.error}
+            {error ?? room.micError ?? room.error ?? camera.error}
             {room.micError && notStarted && (
               <button type="button" className="arena-btn" style={{ marginLeft: "0.8rem" }} onClick={room.startTyped}>
                 Type instead
@@ -166,46 +171,39 @@ export default function PracticeRoomPage() {
             </button>
           </form>
         )}
-        <div className="arena-foot">
+        <div className="meet-bar">
           {notStarted && (
             <>
-              <button type="button" className="arena-btn arena-btn--primary" onClick={() => void room.start()} disabled={!room.connected}>
-                {room.connected ? "Allow microphone and start" : "Connecting…"}
-              </button>
-              <button type="button" className="arena-btn" onClick={room.startTyped} disabled={!room.connected}>
-                Type instead
-              </button>
+              <MeetButton primary icon="mic" label={room.connected ? "Join and speak" : "Connecting…"} onClick={() => void room.start()} disabled={!room.connected} />
+              <MeetButton icon="chat" label="Type instead" onClick={room.startTyped} disabled={!room.connected} />
+              <MeetButton warn icon={camera.on ? "video" : "video-off"} label={camera.on ? "Camera on" : "Camera off"} on={!camera.on} onClick={() => void camera.toggle()} />
             </>
           )}
           {(preparing || live) && (
             <>
               {!room.typing && (
                 <>
-                  <button type="button" className="arena-btn" onClick={room.toggleMute} aria-pressed={room.muted}>
-                    {room.muted ? "Unmute" : "Mute"}
-                  </button>
+                  <MeetButton warn icon={room.muted ? "mic-off" : "mic"} label={room.muted ? "Unmute" : "Mute"} on={room.muted} onClick={room.toggleMute} />
                   <div className="mic-meter" aria-hidden style={{ ["--lvl" as string]: room.muted ? 0 : room.micLevel }}>
                     <span />
                   </div>
                 </>
               )}
+              <MeetButton warn icon={camera.on ? "video" : "video-off"} label={camera.on ? "Camera on" : "Camera off"} on={!camera.on} onClick={() => void camera.toggle()} />
               {live && (
-                <button
-                  type="button"
-                  className="arena-btn"
-                  aria-pressed={handUp}
+                <MeetButton
+                  icon="hand"
+                  label={handUp ? "Hand raised" : "Raise hand"}
+                  on={handUp}
+                  disabled={handUp}
                   onClick={() => {
                     room.raiseHand();
                     setHandUp(true);
                   }}
-                  disabled={handUp}
-                >
-                  {handUp ? "Hand raised" : "Raise hand"}
-                </button>
+                />
               )}
-              <button type="button" className="arena-btn arena-btn--danger" onClick={endNow} disabled={ending}>
-                {ending ? "Ending…" : "Finish and get my report"}
-              </button>
+              <span className="meet-sep" aria-hidden />
+              <MeetButton danger icon="phone-off" label={ending ? "Ending…" : "Leave and get report"} onClick={endNow} disabled={ending || !live} />
             </>
           )}
         </div>

@@ -1,0 +1,530 @@
+/*
+ * The Figma look, shared with the Mock Interview app: forest green on warm
+ * paper, mint for the chosen thing, deep green for the one dark panel on a
+ * screen, Inter throughout. Loaded last, so it only re-points the tokens the
+ * older layers already read and then tunes the few surfaces that carried the
+ * old blue.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@1,400&display=swap");
+
+:root {
+  color-scheme: light;
+  --bg: #f7f8f4;
+  --surface: #ffffff;
+  --surface-2: #f1f3ec;
+  --border: #dde5dc;
+  --text: #192d28;
+  --muted: #68766e;
+  --accent: #176b55;
+  --accent-2: #2f8f72;
+  --accent-soft: #e8f3ec;
+  --gradient: linear-gradient(135deg, #176b55, #2f8f72);
+  --danger: #c2453d;
+  --ok: #176b55;
+  --warn: #b98a1e;
+  --shadow: 0 16px 48px rgb(22 59 39 / 0.07);
+  --radius: 16px;
+
+  --deep: #142d27;
+  --deep-2: #203e35;
+  --deep-line: #3c574b;
+  --mint: #c9f4c8;
+  --mint-muted: #adc4b8;
+
+  --night: var(--surface);
+  --night-2: var(--surface);
+  --table: var(--surface-2);
+  --lamp: var(--accent);
+  --hot: var(--danger);
+  --mist: var(--muted);
+  --glass: var(--surface-2);
+  --glass-edge: var(--border);
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+body {
+  background: var(--bg);
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* Cards are paper with a hairline, 20px on the large ones. */
+.card {
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+/* Primary actions: solid forest green, mint when they sit on deep green. */
+.btn,
+.btn-primary,
+button[type="submit"],
+a.btn {
+  transition: background-color 0.16s, transform 0.16s, box-shadow 0.2s;
+}
+.btn-primary,
+.btn:not(.ghost):not(.secondary):not(.danger) {
+  background: var(--accent);
+  background-image: none;
+  color: #fff;
+  border-color: transparent;
+  box-shadow: none;
+}
+.btn-primary:hover,
+.btn:not(.ghost):not(.secondary):not(.danger):hover {
+  background: #125646;
+  transform: translateY(-1px);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+
+/* Chosen things are mint with a 1.5px green edge, as in the setup design. */
+[aria-pressed="true"],
+[aria-selected="true"],
+.selected,
+.active:not(nav *) {
+  border-color: var(--accent);
+}
+
+/* The one dark panel on a screen. */
+.deep,
+.plan-card,
+.arena-side {
+  background: var(--deep);
+  color: #fff;
+  border: 0;
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+}
+
+/* Pills and tags */
+.pill,
+.tag,
+.chip {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* Inputs */
+input,
+select,
+textarea {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .btn-primary {
+    transition: none;
+  }
+}
+
+/* ───────── The room, as the Mock Interview call draws it ───────── */
+
+.arena {
+  background: var(--bg);
+  border-radius: 20px;
+}
+
+/* Tiles: quiet mint, one calm tone for everyone. The speaker is ringed and
+   breathes; nobody else moves. */
+.vtile {
+  border-radius: 18px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+.vtile--speaking {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgb(23 107 85 / 0.14);
+  animation: figma-breathe 2.2s ease-in-out infinite;
+}
+@keyframes figma-breathe {
+  0%, 100% { box-shadow: 0 0 0 3px rgb(23 107 85 / 0.18); }
+  50% { box-shadow: 0 0 0 8px rgb(23 107 85 / 0.05); }
+}
+.orb {
+  color: var(--deep);
+  background: var(--mint);
+  border: 0;
+}
+.orb-badge {
+  background: var(--deep);
+  color: var(--mint);
+}
+
+/* The live caption and the side panel */
+.caption-bar {
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.side-panel {
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.tab--on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.person,
+.seat-card {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.seat-card:not(.seat-card--empty):hover {
+  border-color: var(--accent);
+}
+
+/* Controls: round, quiet, with the hang-up the only red. */
+.ctl-round {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  transition: transform 0.16s, background-color 0.16s, border-color 0.16s;
+}
+.ctl-round:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+.arena-btn--danger {
+  background: rgb(194 69 61 / 0.1);
+  color: var(--danger);
+  border: 1px solid rgb(194 69 61 / 0.4);
+  border-radius: 999px;
+}
+.arena-btn--danger:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* Chips: the live one pulses softly in green. */
+.chip--ok {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ───────── top navigation, as in the Figma header (replaces the sidebar) ───────── */
+.guestbar { background: rgb(247 248 244 / 0.92); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20; min-height: 72px; padding: 0.5rem max(1.25rem, calc((100vw - 1280px) / 2)); }
+.guestbar .brand.wordmark { font-size: 22px; font-weight: 400; letter-spacing: -1px; color: var(--text); text-decoration: none; }
+.topnav { gap: 2rem; }
+.topnav-links { display: flex; align-items: center; gap: 1.5rem; flex: 1; font-size: 13px; }
+.topnav-link { padding: 0.25rem 0; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; }
+.topnav-link:hover { color: var(--text); text-decoration: none; }
+.topnav-link--active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.topnav-end { display: flex; align-items: center; gap: 0.9rem; }
+.topnav-bell { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 999px; color: var(--muted); }
+.topnav-bell:hover, .topnav-bell--active { background: var(--accent-soft); color: var(--accent); text-decoration: none; }
+.topnav-bell .count { position: absolute; top: -2px; right: -2px; margin: 0; min-width: 16px; line-height: 16px; font-size: 10px; padding: 0 4px; }
+.topnav-user { position: relative; }
+.topnav-user summary { list-style: none; cursor: pointer; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; background: var(--mint); color: #192d28; font-size: 12px; font-weight: 600; }
+.topnav-user summary::-webkit-details-marker { display: none; }
+.topnav-menu { position: absolute; right: 0; top: 46px; width: 220px; display: flex; flex-direction: column; gap: 6px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 48px rgb(22 59 39 / 0.12); }
+.topnav-menu strong { font-size: 13px; }
+.topnav-menu a { font-size: 13px; padding: 6px 0; color: var(--accent); text-decoration: none; }
+.topnav-menu .secondary { margin-top: 4px; }
+@media (max-width: 720px) {
+  .topnav { flex-wrap: wrap; gap: 0.5rem 1rem; padding: 0.6rem 1.25rem; }
+  .topnav-links { order: 3; flex-basis: 100%; overflow-x: auto; gap: 1.1rem; padding-bottom: 2px; white-space: nowrap; }
+  .topnav-end { margin-left: auto; }
+}
+
+.shell { max-width: 1440px; padding: 2.5rem clamp(1.25rem, 5.5vw, 5rem) 4rem; }
+.shell:has(.arena) { max-width: 1440px; padding: 1.25rem clamp(1rem, 3vw, 2.5rem) 2rem; }
+
+/* page openings: a large light title and a calm line under it */
+.page-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 0.5rem; }
+.page-head .gdset-kicker { margin: 0; font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--accent); }
+.page-head h1 { margin: 0; font-size: clamp(32px, 4vw, 43px); font-weight: 500; line-height: 1.15; letter-spacing: -1.8px; color: var(--text); }
+.page-head > p:not(.gdset-kicker) { margin: 0; font-size: 15px; line-height: 1.65; color: var(--muted); max-width: 42rem; }
+.tile-icon--violet { background: #eae5f6; color: #192d28; }
+.tile-icon--teal { background: var(--mint); color: #192d28; }
+.hero h1 { font-weight: 500; letter-spacing: -2.4px; }
+
+/* ───────── live room fills the window below the navigation ───────── */
+@media (min-width: 1001px) {
+  .shell:has(.arena) { padding: 1rem clamp(1rem, 3vw, 2.5rem) 1.25rem; max-width: none; }
+  .arena {
+    height: calc(100dvh - 72px - 2.25rem);
+    min-height: 32rem;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    display: flex; flex-direction: column; gap: 0.75rem;
+  }
+  .room-grid { height: 100%; min-height: 0; align-items: stretch; grid-template-columns: minmax(0, 1fr) 380px; }
+  .room-main { height: 100%; min-height: 0; }
+  .stage-wrap { flex: 1; min-height: 0; }
+  .tiles { flex: 1; min-height: 0; grid-auto-rows: minmax(0, 1fr); }
+  .tiles[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
+  .tiles[data-count="3"], .tiles[data-count="5"], .tiles[data-count="6"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .vtile { aspect-ratio: auto; height: 100%; min-height: 0; }
+  .side-panel { height: 100%; }
+}
+.feed-avatar { background: var(--mint) !important; color: #192d28 !important; }
+.vtile { background: var(--accent-soft) !important; }
+@media (min-width: 1001px) {
+  .room-main { overflow-y: auto; gap: 0.6rem; }
+  .stage-wrap { min-height: 18rem; }
+  .video-strip { flex-shrink: 0; }
+  .video-strip video { max-width: 9rem; }
+  .room-main .controls { padding: 0.1rem 0; flex-shrink: 0; }
+  .room-main .alert { flex-shrink: 0; padding: 0.5rem 0.8rem; }
+}
+@media (min-width: 1001px) {
+  .arena > .room-grid, .arena > .stage-wrap { flex: 1; min-height: 0; }
+  .arena > .stage-wrap .tiles[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1001px) {
+  .arena > .arena-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+  .arena-stage > .stage-wrap { flex: 1; min-height: 0; }
+}
+
+/* ───────── hover: never the old blue ───────── */
+button:hover:not(:disabled) {
+  filter: none;
+  background: color-mix(in srgb, var(--accent) 88%, #000);
+}
+button.secondary:hover:not(:disabled),
+button.ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+/* Cards and toggles that happen to be buttons keep their own face on hover. */
+button[aria-pressed]:hover:not(:disabled),
+button.gdset-opt:hover:not(:disabled),
+button.gdset-person:hover:not(:disabled),
+.gdset-seg button:hover:not(:disabled) {
+  filter: none;
+  background: var(--surface);
+  color: var(--text);
+}
+button.gdset-opt[aria-pressed="true"]:hover:not(:disabled),
+button.gdset-person[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+.gdset-seg button[aria-pressed="false"]:hover:not(:disabled) { background: var(--surface-2); }
+.gdset-seg button[aria-pressed="true"]:hover:not(:disabled) { background: var(--accent); color: #fff; }
+/* Round and toolbar controls in the rooms. */
+.ctl-round:hover:not(:disabled), .arena-btn:hover:not(:disabled) { filter: none; background: var(--accent-soft); color: var(--text); }
+.arena-btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); color: #fff; }
+.arena-btn--danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   The meeting room.
+   A dark canvas so faces and cameras carry the page: video tiles, live captions,
+   one glass control bar. Colour is spent in one place, the outline and equaliser
+   on whoever holds the floor.
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+.arena {
+  /* Re-point the app's tokens inside the room, so the side panel, alerts, notices
+     and inputs follow without being restyled one by one. */
+  --text: #e8f3ec;
+  --muted: #9db8ab;
+  --border: rgb(201 244 200 / 0.14);
+  --surface: #111f1a;
+  --surface-2: #162821;
+  --accent-soft: rgb(201 244 200 / 0.1);
+  --mt-mint: #c9f4c8;
+  --mt-line: rgb(201 244 200 / 0.14);
+  position: relative; display: flex; flex-direction: column; gap: 14px;
+  padding: 16px 18px 18px; border-radius: 28px; overflow: hidden;
+  background: #0b1411; color: var(--text);
+  box-shadow: 0 30px 70px -36px rgb(8 20 16 / 0.7);
+}
+.arena a { color: inherit; }
+
+/* header: the topic, the clock, who is live */
+.arena .arena-head { align-items: center; gap: 16px; padding: 2px 4px; }
+.arena .arena-title { display: flex; align-items: center; gap: 10px; }
+.arena .arena-title h1 { margin: 0; font: 600 13px/1 Inter, sans-serif; letter-spacing: 0; color: var(--muted); }
+.arena .arena-sub { margin: 6px 0 0; max-width: 62ch; font: 600 clamp(1.05rem, 1.8vw, 1.4rem)/1.25 Inter, sans-serif; letter-spacing: -0.02em; color: var(--text); }
+.arena .arena-phase { background: rgb(255 255 255 / 0.07); color: var(--text); }
+.arena .arena-phase i { background: var(--mt-mint); }
+.arena .arena-phase--live { background: rgb(212 73 63 / 0.2); color: #ffb0a8; }
+.arena .arena-phase--live i { background: #ff6b5f; }
+.arena .timer-pill { background: rgb(255 255 255 / 0.07); border-color: var(--mt-line); color: var(--text); }
+.arena .timer-pill small { color: var(--muted); }
+.arena .timer-pill--warn { color: #ffb4ab; border-color: rgb(255 180 171 / 0.35); }
+
+/* the stage */
+.mt { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.mt-grid { list-style: none; margin: 0; padding: 0; flex: 1 1 0; min-height: 0; display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
+.mt-grid[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
+.mt-grid[data-count="3"], .mt-grid[data-count="5"], .mt-grid[data-count="6"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mt-tile { --tone: #c9f4c8; position: relative; min-height: 0; border-radius: 20px; overflow: hidden; background: linear-gradient(160deg, #18362e 0%, #0f201b 100%); border: 1px solid var(--mt-line); transition: box-shadow 0.25s, border-color 0.25s, opacity 0.3s; }
+.mt-tile:nth-child(6n + 2) { --tone: #eae5f6; }
+.mt-tile:nth-child(6n + 3) { --tone: #f0ecdd; }
+.mt-tile:nth-child(6n + 4) { --tone: #8dcba4; }
+.mt-tile:nth-child(6n + 5) { --tone: #dce6b5; }
+.mt-tile:nth-child(6n + 6) { --tone: #bcd8ea; }
+.mt-media { position: absolute; inset: 0; display: grid; place-items: center; }
+.mt-avatar { display: grid; place-items: center; width: min(34%, 120px); min-width: 60px; aspect-ratio: 1; border-radius: 50%; background: var(--tone); color: #192d28; font: 500 clamp(26px, 3.6vw, 48px)/1 Inter, sans-serif; }
+.mt-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #0b1411; }
+.mt-tile--you .mt-video { transform: scaleX(-1); }
+.mt-video--off { display: none; }
+.mt-slot { position: absolute; inset: 0; }
+.mt-slot video { width: 100%; height: 100%; object-fit: cover; }
+.mt-tile:has(.mt-video:not(.mt-video--off)) .mt-avatar,
+.mt-tile:has(.mt-slot video) .mt-avatar { display: none; }
+.mt-tile--speaking { border-color: var(--mt-mint); box-shadow: 0 0 0 2px var(--mt-mint), 0 0 40px -8px rgb(201 244 200 / 0.5); }
+.mt-tile--away { opacity: 0.5; }
+.mt-chip { position: absolute; left: 12px; bottom: 12px; z-index: 2; max-width: calc(100% - 24px); display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 999px; background: rgb(8 20 16 / 0.62); backdrop-filter: blur(8px); border: 1px solid rgb(255 255 255 / 0.08); color: #fff; font: 600 13px/1 Inter, sans-serif; }
+.mt-chip svg { flex: none; }
+.mt-chip .mt-muted { color: #ff8b80; }
+.mt-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-chip small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.mt-chip .eq i { background: var(--mt-mint); }
+.mt-ai { position: absolute; right: 12px; top: 12px; z-index: 2; padding: 4px 8px; border-radius: 999px; background: rgb(8 20 16 / 0.62); border: 1px solid rgb(201 244 200 / 0.3); color: var(--mt-mint); font: 600 11px/1 Inter, sans-serif; }
+.mt-strike { position: absolute; left: 12px; top: 12px; z-index: 2; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: #e5736a; color: #fff; font: 600 12px/22px Inter, sans-serif; text-align: center; }
+
+/* live captions */
+.mt-caption { display: flex; align-items: baseline; gap: 12px; min-height: 52px; padding: 12px 18px; border-radius: 16px; background: #111f1a; border: 1px solid var(--mt-line); }
+.mt-caption .caption-who { flex: none; margin: 0; font: 600 13px/1.4 Inter, sans-serif; color: var(--mt-mint); }
+.mt-caption .caption-now { margin: 0; font: 400 16px/1.5 Inter, sans-serif; color: var(--text); }
+.mt-caption > p:not([class]) { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.mt-caption:has(.caption-who) { flex-wrap: wrap; }
+
+/* the control bar */
+.meet-bar { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 10px; width: fit-content; max-width: 100%; margin: 0 auto; padding: 10px 16px; border-radius: 22px; background: #111f1a; border: 1px solid var(--mt-line); }
+.meet-btn { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 66px; padding: 2px 6px; border: 0; background: transparent; color: var(--muted); font: 500 11px/1 Inter, sans-serif; cursor: pointer; }
+.meet-ico { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: rgb(255 255 255 / 0.09); color: #fff; transition: background 0.15s, transform 0.15s; }
+.arena .meet-btn:hover:not(:disabled) { background: transparent; filter: none; color: #fff; }
+.meet-btn:hover:not(:disabled) .meet-ico { background: rgb(255 255 255 / 0.18); }
+.meet-btn:active:not(:disabled) .meet-ico { transform: scale(0.94); }
+.meet-btn[aria-pressed="true"] .meet-ico { background: var(--mt-mint); color: #0b1411; }
+.meet-btn[aria-pressed="true"] { color: #fff; }
+.meet-btn--primary .meet-ico { background: #176b55; color: #fff; }
+.meet-btn--primary { color: #fff; }
+.meet-btn--primary:hover:not(:disabled) .meet-ico { background: #1d8268; }
+.meet-btn--danger .meet-ico { width: 64px; border-radius: 23px; background: #d4493f; color: #fff; }
+.meet-btn--danger:hover:not(:disabled) .meet-ico { background: #e15a50; }
+.meet-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.meet-btn:focus-visible { outline: 2px solid var(--mt-mint); outline-offset: 3px; border-radius: 14px; }
+.meet-sep { align-self: stretch; width: 1px; margin: 4px 6px; background: var(--mt-line); }
+.arena .mic-meter { width: 52px; height: 4px; border-radius: 999px; background: rgb(255 255 255 / 0.12); overflow: hidden; }
+.arena .mic-meter span { display: block; height: 100%; width: calc(var(--lvl, 0) * 100%); border-radius: 999px; background: var(--mt-mint); transition: width 0.08s; }
+
+/* what is left of the old controls, in the room's colours */
+.arena .arena-hint { max-width: 58ch; margin: 0 auto; text-align: center; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.arena .arena-btn { height: 42px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--mt-line); background: rgb(255 255 255 / 0.08); color: #fff; font: 600 14px/1 Inter, sans-serif; }
+.arena .arena-btn:hover:not(:disabled) { background: rgb(255 255 255 / 0.16); color: #fff; filter: none; }
+.arena .arena-btn--primary { background: #176b55; border-color: transparent; }
+.arena .arena-btn--primary:hover:not(:disabled) { background: #1d8268; }
+.arena .arena-btn--danger { background: transparent; border-color: rgb(212 73 63 / 0.6); color: #ffb0a8; }
+.arena .composer { display: flex; gap: 10px; width: 100%; max-width: 760px; margin: 0 auto; }
+.arena .composer input { flex: 1; height: 46px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--mt-line); background: #111f1a; color: var(--text); font: 400 15px Inter, sans-serif; }
+.arena .alert--error { background: rgb(212 73 63 / 0.14); border-color: rgb(212 73 63 / 0.45); color: #ffb4ab; }
+.arena .notice { background: #111f1a; border: 1px solid var(--mt-line); color: var(--text); }
+.arena .captions { color: var(--muted); }
+
+/* speaking time: one bar */
+.arena .floor { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 760px; margin: 0 auto; }
+.arena .floor-seg { display: flex; gap: 3px; height: 8px; border-radius: 999px; overflow: hidden; background: rgb(255 255 255 / 0.1); }
+.arena .floor-seg i { display: block; min-width: 6px; border-radius: 999px; background: var(--tone, #c9f4c8); transition: flex-grow 0.6s; }
+.arena .floor-seg i[style*="--i: 1;"], .arena .floor-key li[style*="--i: 1;"] { --tone: #b8aee0; }
+.arena .floor-seg i[style*="--i: 2;"], .arena .floor-key li[style*="--i: 2;"] { --tone: #d9cf9f; }
+.arena .floor-seg i[style*="--i: 3;"], .arena .floor-key li[style*="--i: 3;"] { --tone: #6eaa8a; }
+.arena .floor-seg i[style*="--i: 4;"], .arena .floor-key li[style*="--i: 4;"] { --tone: #b4c765; }
+.arena .floor-seg i[style*="--i: 5;"], .arena .floor-key li[style*="--i: 5;"] { --tone: #8fbfdb; }
+.arena .floor-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 20px; font-size: 12.5px; }
+.arena .floor-key li { --tone: #c9f4c8; display: flex; align-items: center; gap: 7px; }
+.arena .floor-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); }
+.arena .floor-name { color: var(--text); font-weight: 500; }
+.arena .floor-num { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* the side panel (the human room) */
+.arena .side-panel { background: #111f1a; border: 1px solid var(--mt-line); box-shadow: none; border-radius: 20px; color: var(--text); }
+.arena .tab { color: var(--muted); }
+.arena .tab--on { color: var(--mt-mint); border-color: var(--mt-mint); }
+
+/* layout: the stage takes what the controls leave */
+.arena > .arena-stage { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.arena-stage > .mt, .room-main > .mt { flex: 1 1 0; min-height: 14rem; }
+.room-grid { flex: 1 1 0; min-height: 0; }
+.room-main { min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.arena .stack { flex: none; gap: 0.6rem !important; }
+.shell:has(.arena) { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+@media (min-width: 1001px) {
+  .arena { height: calc(100dvh - 5.5rem); min-height: 34rem; }
+  .room-grid { grid-template-columns: minmax(0, 1fr) 360px; align-items: stretch; height: 100%; }
+  .arena .side-panel { height: 100%; }
+}
+@media (max-width: 1000px) {
+  .arena { height: auto; min-height: 0; padding: 12px; border-radius: 22px; }
+  .mt-grid { grid-auto-rows: auto; }
+  .mt-tile { aspect-ratio: 4 / 3; }
+  .mt-grid[data-count="3"], .mt-grid[data-count="5"], .mt-grid[data-count="6"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .meet-btn { min-width: 56px; }
+  .room-grid { grid-template-columns: minmax(0, 1fr); }
+  .arena .side-panel { height: 24rem; }
+}
+@media (prefers-reduced-motion: reduce) { .mt-tile, .meet-ico { transition: none; } }
+.meet-btn--warn[aria-pressed="true"] .meet-ico { background: #d4493f; color: #fff; }
+
+/* The stage keeps a proper size; the controls stay in view as the page scrolls. */
+.mt-avatar { width: auto; height: min(56%, 124px); min-width: 0; aspect-ratio: 1; }
+@media (min-width: 1001px) {
+  .arena { height: auto; min-height: calc(100dvh - 5.5rem); overflow: visible; }
+  .arena:has(.room-grid) { height: calc(100dvh - 5.5rem); overflow: hidden; }
+  .arena > .arena-stage { flex: 1 0 auto; }
+  .arena-stage > .mt { flex: 1 0 auto; min-height: 25rem; }
+  .room-main > .mt { flex: 1 1 0; min-height: 16rem; }
+  .arena > .stack { position: sticky; bottom: 0; z-index: 6; padding: 14px 0 2px; background: linear-gradient(to bottom, rgb(11 20 17 / 0) 0, #0b1411 26px); }
+  .arena > .stack .arena-hint { font-size: 12px; }
+}
+.mt-video { opacity: 0; }
+.mt-video--live { opacity: 1; }
+.mt-tile:has(.mt-video:not(.mt-video--off)) .mt-avatar { display: grid; }
+.mt-tile:has(.mt-video--live) .mt-avatar, .mt-tile:has(.mt-slot video) .mt-avatar { display: none; }
+
+/* No overlap: the lower block sits in the flow, and the caption bar replaces the old transcript list. */
+@media (min-width: 1001px) {
+  .arena > .stack { position: static; padding: 0; background: none; }
+  .arena-stage > .mt { min-height: 21rem; }
+}
+.arena .captions { display: none; }
+.arena .arena-hint { font-size: 12px; line-height: 1.5; max-width: 64ch; }
+@media (max-width: 1000px) {
+  .mt-avatar { height: 42%; transform: translateY(-12%); }
+  .mt-chip { left: 8px; bottom: 8px; height: 26px; padding: 0 9px; font-size: 12px; gap: 6px; }
+  .mt-chip small { display: none; }
+}
