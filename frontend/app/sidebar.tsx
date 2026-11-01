@@ -67,8 +67,9 @@ export function Sidebar() {
   }
 
   const brand = (
-    <Link href="/" className="brand wordmark">
-      Logo
+    <Link href="/" className="brand wordmark" aria-label="Home">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo.png" alt="" height={36} style={{ height: 36, width: "auto", display: "block" }} />
     </Link>
   );
 
