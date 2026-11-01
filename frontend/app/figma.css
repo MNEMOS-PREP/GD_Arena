@@ -240,3 +240,40 @@ a:focus-visible {
   background: var(--accent-soft);
   color: var(--accent);
 }
+
+/* ───────── top navigation, as in the Figma header (replaces the sidebar) ───────── */
+.guestbar { background: rgb(247 248 244 / 0.92); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20; min-height: 72px; padding: 0.5rem max(1.25rem, calc((100vw - 1280px) / 2)); }
+.guestbar .brand.wordmark { font-size: 22px; font-weight: 400; letter-spacing: -1px; color: var(--text); text-decoration: none; }
+.topnav { gap: 2rem; }
+.topnav-links { display: flex; align-items: center; gap: 1.5rem; flex: 1; font-size: 13px; }
+.topnav-link { padding: 0.25rem 0; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; }
+.topnav-link:hover { color: var(--text); text-decoration: none; }
+.topnav-link--active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.topnav-end { display: flex; align-items: center; gap: 0.9rem; }
+.topnav-bell { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 999px; color: var(--muted); }
+.topnav-bell:hover, .topnav-bell--active { background: var(--accent-soft); color: var(--accent); text-decoration: none; }
+.topnav-bell .count { position: absolute; top: -2px; right: -2px; margin: 0; min-width: 16px; line-height: 16px; font-size: 10px; padding: 0 4px; }
+.topnav-user { position: relative; }
+.topnav-user summary { list-style: none; cursor: pointer; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; background: var(--mint); color: #192d28; font-size: 12px; font-weight: 600; }
+.topnav-user summary::-webkit-details-marker { display: none; }
+.topnav-menu { position: absolute; right: 0; top: 46px; width: 220px; display: flex; flex-direction: column; gap: 6px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 48px rgb(22 59 39 / 0.12); }
+.topnav-menu strong { font-size: 13px; }
+.topnav-menu a { font-size: 13px; padding: 6px 0; color: var(--accent); text-decoration: none; }
+.topnav-menu .secondary { margin-top: 4px; }
+@media (max-width: 720px) {
+  .topnav { flex-wrap: wrap; gap: 0.5rem 1rem; padding: 0.6rem 1.25rem; }
+  .topnav-links { order: 3; flex-basis: 100%; overflow-x: auto; gap: 1.1rem; padding-bottom: 2px; white-space: nowrap; }
+  .topnav-end { margin-left: auto; }
+}
+
+.shell { max-width: 1440px; padding: 2.5rem clamp(1.25rem, 5.5vw, 5rem) 4rem; }
+.shell:has(.arena) { max-width: 1440px; padding: 1.25rem clamp(1rem, 3vw, 2.5rem) 2rem; }
+
+/* page openings: a large light title and a calm line under it */
+.page-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 0.5rem; }
+.page-head .gdset-kicker { margin: 0; font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--accent); }
+.page-head h1 { margin: 0; font-size: clamp(32px, 4vw, 43px); font-weight: 500; line-height: 1.15; letter-spacing: -1.8px; color: var(--text); }
+.page-head > p:not(.gdset-kicker) { margin: 0; font-size: 15px; line-height: 1.65; color: var(--muted); max-width: 42rem; }
+.tile-icon--violet { background: #eae5f6; color: #192d28; }
+.tile-icon--teal { background: var(--mint); color: #192d28; }
+.hero h1 { font-weight: 500; letter-spacing: -2.4px; }

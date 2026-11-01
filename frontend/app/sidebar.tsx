@@ -67,11 +67,8 @@ export function Sidebar() {
   }
 
   const brand = (
-    <Link href="/" className="brand">
-      <span className="logo-mark" aria-hidden>
-        GD
-      </span>
-      <span>GD Platform</span>
+    <Link href="/" className="brand wordmark">
+      Logo
     </Link>
   );
 
@@ -115,45 +112,46 @@ export function Sidebar() {
     );
   }
 
-  const item = (href: string, label: string, icon: IconName, active: boolean, badge?: number) => (
-    <Link
-      key={href}
-      href={href}
-      className={`side-link ${active ? "side-link--active" : ""}`}
-      aria-current={active ? "page" : undefined}
-    >
-      <Icon name={icon} className="nav-icon" />
-      <span>{label}</span>
-      {badge ? (
-        <span className="count" aria-label={`${badge} unread`}>
-          {badge}
-        </span>
-      ) : null}
-    </Link>
-  );
-
   const initial = (user.full_name || user.email)[0].toUpperCase();
 
   return (
-    <aside className="sidebar">
+    <header className="guestbar topnav">
       {brand}
-      <nav className="side-nav" aria-label="Main">
-        {MAIN_NAV.map((n) => item(n.href, n.label, n.icon, n.match(pathname)))}
+      <nav className="topnav-links" aria-label="Main">
+        {MAIN_NAV.map((n) => (
+          <Link
+            key={n.href}
+            href={n.href}
+            className={`topnav-link ${n.match(pathname) ? "topnav-link--active" : ""}`}
+            aria-current={n.match(pathname) ? "page" : undefined}
+          >
+            {n.label}
+          </Link>
+        ))}
       </nav>
-      <nav className="side-nav side-nav--lower" aria-label="Account">
-        {item("/notifications", "Notifications", "bell", pathname === "/notifications", unread)}
-        {item("/profile", "Profile", "user", pathname === "/profile")}
-      </nav>
-      <div className="side-user">
-        <span className="avatar">{initial}</span>
-        <span className="side-user-name">
-          {user.full_name}
-          <span className="meta">{user.role}</span>
-        </span>
-        <button type="button" className="secondary side-signout" onClick={handleSignOut}>
-          Sign out
-        </button>
+      <div className="topnav-end">
+        <Link
+          href="/notifications"
+          className={`topnav-bell ${pathname === "/notifications" ? "topnav-bell--active" : ""}`}
+          aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
+        >
+          <Icon name="bell" className="nav-icon" />
+          {unread ? <span className="count">{unread}</span> : null}
+        </Link>
+        <details className="topnav-user">
+          <summary className="avatar" aria-label="Account">
+            {initial}
+          </summary>
+          <div className="topnav-menu">
+            <strong>{user.full_name}</strong>
+            <span className="meta">{user.role}</span>
+            <Link href="/profile">Profile</Link>
+            <button type="button" className="secondary" onClick={handleSignOut}>
+              Sign out
+            </button>
+          </div>
+        </details>
       </div>
-    </aside>
+    </header>
   );
 }
