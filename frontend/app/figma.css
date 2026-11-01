@@ -316,3 +316,33 @@ a:focus-visible {
   .arena > .arena-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0.75rem; }
   .arena-stage > .stage-wrap { flex: 1; min-height: 0; }
 }
+
+/* ───────── hover: never the old blue ───────── */
+button:hover:not(:disabled) {
+  filter: none;
+  background: color-mix(in srgb, var(--accent) 88%, #000);
+}
+button.secondary:hover:not(:disabled),
+button.ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+/* Cards and toggles that happen to be buttons keep their own face on hover. */
+button[aria-pressed]:hover:not(:disabled),
+button.gdset-opt:hover:not(:disabled),
+button.gdset-person:hover:not(:disabled),
+.gdset-seg button:hover:not(:disabled) {
+  filter: none;
+  background: var(--surface);
+  color: var(--text);
+}
+button.gdset-opt[aria-pressed="true"]:hover:not(:disabled),
+button.gdset-person[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+.gdset-seg button[aria-pressed="false"]:hover:not(:disabled) { background: var(--surface-2); }
+.gdset-seg button[aria-pressed="true"]:hover:not(:disabled) { background: var(--accent); color: #fff; }
+/* Round and toolbar controls in the rooms. */
+.ctl-round:hover:not(:disabled), .arena-btn:hover:not(:disabled) { filter: none; background: var(--accent-soft); color: var(--text); }
+.arena-btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); color: #fff; }
+.arena-btn--danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
