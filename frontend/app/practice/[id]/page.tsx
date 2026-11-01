@@ -203,7 +203,7 @@ export default function PracticeRoomPage() {
                   {handUp ? "Hand raised" : "Raise hand"}
                 </button>
               )}
-              <button type="button" className="arena-btn arena-btn--danger" onClick={endNow} disabled={ending}>
+              <button type="button" className="arena-btn arena-btn--danger" onClick={endNow} disabled={ending || !live}>
                 {ending ? "Ending…" : "Finish and get my report"}
               </button>
             </>

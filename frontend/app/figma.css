@@ -6,7 +6,7 @@
  * old blue.
  */
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@1,400&display=swap");
 
 :root {
   color-scheme: light;
@@ -346,3 +346,118 @@ button.gdset-person[aria-pressed="true"]:hover:not(:disabled) {
 .ctl-round:hover:not(:disabled), .arena-btn:hover:not(:disabled) { filter: none; background: var(--accent-soft); color: var(--text); }
 .arena-btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); color: #fff; }
 .arena-btn--danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   The discussion room, redrawn.
+   One deep-green stage with the people on it; whoever holds the floor grows and
+   gives off ripples; what was said last is set large underneath. Everything else
+   (header, speaking-time bar, controls) stays quiet.
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/* ── header: the topic is the title ── */
+.arena-head { align-items: flex-end; gap: 24px; }
+.arena-title { display: flex; align-items: center; gap: 10px; }
+.arena-title h1 { margin: 0; font: 600 13px/1 Inter, sans-serif; letter-spacing: 0; color: var(--muted); max-width: none; }
+.arena-sub { margin: 10px 0 0; max-width: 34ch; font: 500 clamp(1.5rem, 2.6vw, 2.125rem)/1.15 Inter, sans-serif; letter-spacing: -0.03em; color: var(--text); }
+.arena-phase { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font: 600 12px/1 Inter, sans-serif; }
+.arena-phase i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.arena-phase--live { background: #fbe9e7; color: #b3382f; }
+.arena-phase--live i { background: #d4493f; }
+.timer-pill { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 999px; background: #fff; border: 1px solid var(--border); font: 600 15px/1 Inter, sans-serif; color: var(--text); font-variant-numeric: tabular-nums; }
+.timer-pill small { color: var(--muted); font-weight: 500; font-size: 13px; }
+.timer-pill .rec { width: 8px; height: 8px; border-radius: 50%; background: #d4493f; animation: none; }
+.timer-pill--warn { color: #b3382f; border-color: #e5b5b0; }
+
+/* ── the stage ── */
+.gdt {
+  display: flex; flex-direction: column; justify-content: space-between; gap: 28px;
+  min-height: 22rem; padding: clamp(24px, 3.2vw, 44px);
+  background: radial-gradient(120% 90% at 50% 0%, #1c3d35 0%, #142d27 52%, #10241f 100%);
+  border-radius: 28px; color: #fff; overflow: hidden;
+  box-shadow: 0 28px 64px -32px rgb(22 59 39 / 0.6);
+}
+.gdt-seats { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 28px clamp(24px, 4vw, 56px); }
+.gdt-seat { --size: clamp(68px, 8vw, 96px); --tone: #c9f4c8; display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 96px; transition: opacity 0.3s; }
+.gdt-seat:nth-child(6n + 2) { --tone: #eae5f6; }
+.gdt-seat:nth-child(6n + 3) { --tone: #f0ecdd; }
+.gdt-seat:nth-child(6n + 4) { --tone: #8dcba4; }
+.gdt-seat:nth-child(6n + 5) { --tone: #dce6b5; }
+.gdt-seat:nth-child(6n + 6) { --tone: #bcd8ea; }
+.gdt-avatar { position: relative; width: var(--size); height: var(--size); display: grid; place-items: center; transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.gdt-face { position: relative; z-index: 1; width: 100%; height: 100%; display: grid; place-items: center; border-radius: 50%; background: var(--tone); color: #192d28; font: 500 calc(var(--size) * 0.38)/1 Inter, sans-serif; }
+.gdt-seat--you .gdt-face { background: transparent; color: #c9f4c8; box-shadow: inset 0 0 0 2px #c9f4c8; }
+.gdt-ripple { position: absolute; inset: 0; border-radius: 50%; border: 2px solid #c9f4c8; opacity: 0; pointer-events: none; }
+.gdt-seat--speaking .gdt-avatar { transform: scale(1.14); }
+.gdt-seat--speaking.gdt-seat--you .gdt-avatar { transform: scale(calc(1.06 + var(--lvl, 0.2) * 0.2)); }
+.gdt-seat--speaking .gdt-ripple { animation: gdt-ripple 1.9s ease-out infinite; }
+.gdt-seat--speaking .gdt-ripple::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid #c9f4c8; animation: gdt-ripple 1.9s 0.65s ease-out infinite; }
+@keyframes gdt-ripple { 0% { transform: scale(1); opacity: 0.7; } 100% { transform: scale(1.75); opacity: 0; } }
+.gdt-ai { position: absolute; right: -6px; bottom: 2px; z-index: 2; padding: 4px 6px; border-radius: 999px; background: #0e1f1a; color: #c9f4c8; border: 1px solid #3c574b; font: 600 10px/1 Inter, sans-serif; }
+.gdt-strike { position: absolute; left: -4px; top: -4px; z-index: 2; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e5736a; color: #fff; font: 600 11px/20px Inter, sans-serif; text-align: center; }
+.gdt-name { font: 600 14px/1.2 Inter, sans-serif; color: #fff; text-align: center; }
+.gdt-status { min-height: 14px; display: flex; align-items: center; justify-content: center; font: 400 12px/1.2 Inter, sans-serif; color: #adc4b8; }
+.gdt .eq i { background: #c9f4c8; }
+.gdt-seat--away { opacity: 0.45; }
+
+.gdt-caption { min-height: 7.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding-top: 24px; border-top: 1px solid rgb(201 244 200 / 0.14); text-align: center; }
+.gdt-caption .caption-who { display: block; margin: 0; font: 600 13px/1 Inter, sans-serif; color: #c9f4c8; }
+.gdt-caption .caption-now { display: block; margin: 0; max-width: 44ch; font-family: Lora, Georgia, serif; font-style: italic; font-weight: 400; font-size: clamp(1.25rem, 2.2vw, 1.8rem); line-height: 1.4; color: #fff; }
+.gdt-caption > p:not([class]) { margin: 0; max-width: 46ch; font-size: 15px; line-height: 1.6; color: #adc4b8; }
+
+/* ── speaking time: one bar, then who is who ── */
+.floor { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 760px; margin: 0 auto; }
+.floor-seg { display: flex; gap: 3px; height: 10px; border-radius: 999px; overflow: hidden; background: rgb(25 45 40 / 0.08); }
+.floor-seg i { display: block; min-width: 6px; border-radius: 999px; background: #c9f4c8; transition: flex-grow 0.6s; }
+.floor-seg i[style*="--i: 1;"], .floor-key li[style*="--i: 1;"] { --tone: #b8aee0; }
+.floor-seg i[style*="--i: 2;"], .floor-key li[style*="--i: 2;"] { --tone: #d9cf9f; }
+.floor-seg i[style*="--i: 3;"], .floor-key li[style*="--i: 3;"] { --tone: #6eaa8a; }
+.floor-seg i[style*="--i: 4;"], .floor-key li[style*="--i: 4;"] { --tone: #b4c765; }
+.floor-seg i[style*="--i: 5;"], .floor-key li[style*="--i: 5;"] { --tone: #8fbfdb; }
+.floor-seg i { background: var(--tone, #c9f4c8); }
+.floor-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 22px; font-size: 13px; }
+.floor-key li { --tone: #c9f4c8; display: flex; align-items: center; gap: 8px; }
+.floor-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--tone); box-shadow: inset 0 0 0 1px rgb(25 45 40 / 0.15); }
+.floor-name { color: var(--text); font-weight: 500; }
+.floor-num { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ── controls: one floating pill ── */
+.arena-foot { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; width: fit-content; max-width: 100%; margin: 0 auto; padding: 10px; border-radius: 999px; background: #fff; border: 1px solid var(--border); box-shadow: 0 16px 44px -24px rgb(22 59 39 / 0.4); }
+.arena-foot .arena-btn { height: 46px; padding: 0 22px; border-radius: 999px; border: 1px solid transparent; background: #f1f3ec; color: var(--text); font: 600 14px/1 Inter, sans-serif; cursor: pointer; }
+.arena-foot .arena-btn:hover:not(:disabled) { background: #e8f3ec; color: var(--text); filter: none; }
+.arena-foot .arena-btn[aria-pressed="true"] { background: #c9f4c8; color: #192d28; }
+.arena-foot .arena-btn--primary { background: var(--accent); color: #fff; }
+.arena-foot .arena-btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); color: #fff; }
+.arena-foot .arena-btn--danger { background: #fff; border-color: #e5b5b0; color: #b3382f; }
+.arena-foot .arena-btn--danger:hover:not(:disabled) { background: #b3382f; border-color: #b3382f; color: #fff; }
+.arena-foot .arena-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.mic-meter { width: 84px; height: 6px; border-radius: 999px; background: rgb(25 45 40 / 0.1); overflow: hidden; }
+.mic-meter span { display: block; height: 100%; width: calc(var(--lvl, 0) * 100%); border-radius: 999px; background: var(--accent); transition: width 0.08s; }
+.arena-hint { max-width: 58ch; margin: 0 auto; text-align: center; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.composer { display: flex; gap: 10px; width: 100%; max-width: 760px; margin: 0 auto; }
+.composer input { flex: 1; height: 48px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--border); background: #fff; font: 400 15px Inter, sans-serif; }
+
+/* ── layout: the stage takes the room, the controls stay in view ── */
+@media (min-width: 1001px) {
+  .arena { height: auto; min-height: calc(100dvh - 72px - 2.25rem); overflow: visible; gap: 20px; }
+  .arena:has(.room-grid) { height: calc(100dvh - 72px - 2.25rem); overflow: hidden; }
+  .arena > .arena-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+  .arena-stage > .gdt, .room-main > .gdt { flex: 1; min-height: 20rem; }
+}
+@media (max-width: 1000px) {
+  .gdt { min-height: 0; border-radius: 22px; }
+  .arena-foot { border-radius: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gdt-seat--speaking .gdt-ripple, .gdt-seat--speaking .gdt-ripple::after { animation: none; opacity: 0.6; }
+}
+
+/* Fit the window: the stage gives up space before the controls fall below the fold. */
+@media (min-width: 1001px) {
+  .arena { height: calc(100dvh - 72px - 2.25rem); min-height: 36rem; overflow: visible; gap: 16px; }
+  .arena:has(.room-grid) { overflow: hidden; }
+  .arena > .arena-stage { flex: 1 1 0; min-height: 0; }
+  .arena-stage > .gdt, .room-main > .gdt { flex: 1 1 0; min-height: 15rem; }
+  .gdt { padding: clamp(20px, 2.4vw, 32px); gap: 20px; }
+  .gdt-caption { min-height: 6rem; padding-top: 18px; }
+  .arena .stack { gap: 0.6rem !important; }
+}

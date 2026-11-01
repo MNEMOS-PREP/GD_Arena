@@ -49,9 +49,9 @@ export function Orb({ seat, children }: { seat: SeatInfo; children?: ReactNode }
 }
 
 /**
- * Everyone in the room as a tile. There is no video here, so each tile is an
- * avatar; the one holding the floor gets a ring and live level bars. The caption
- * under the grid is whatever was said last.
+ * Everyone in the room, round, on one deep-green stage. There is no video, so
+ * each seat is an avatar; whoever holds the floor grows and gives off ripples,
+ * and what was said last is set large underneath, as a pull-quote.
  */
 export function RoundTable({
   seats,
@@ -62,16 +62,29 @@ export function RoundTable({
 }) {
   const ordered = [...seats].sort((a, b) => Number(!!b.you) - Number(!!a.you));
   return (
-    <div className="stage-wrap">
-      <div className="tiles" data-count={Math.min(ordered.length, 6)}>
-        {ordered.map((seat) => (
-          <div
+    <section className="gdt" aria-label="The table">
+      <ul className="gdt-seats" data-count={Math.min(ordered.length, 6)}>
+        {ordered.map((seat, i) => (
+          <li
             key={seat.label}
-            className={`vtile ${seat.speaking ? "vtile--speaking" : ""} ${seat.away ? "vtile--away" : ""}`}
-            style={{ "--h": seat.hue ?? hueFor(seat.label) } as CSSProperties}
+            className={`gdt-seat ${seat.you ? "gdt-seat--you" : ""} ${seat.speaking ? "gdt-seat--speaking" : ""} ${seat.away ? "gdt-seat--away" : ""}`}
+            style={{ "--i": i, "--lvl": seat.speaking ? Math.max(seat.level ?? 0.35, 0.2) : 0 } as CSSProperties}
           >
-            <Orb seat={seat} />
-            <div className="vtile-label">
+            <span className="gdt-avatar">
+              <span className="gdt-ripple" aria-hidden />
+              <span className="gdt-face">{seat.name.slice(0, 1).toUpperCase()}</span>
+              {seat.badge && <span className="gdt-ai">{seat.badge}</span>}
+              {(seat.strikes ?? 0) > 0 && (
+                <span className="gdt-strike" title="Interruptions made">
+                  {seat.strikes}
+                </span>
+              )}
+            </span>
+            <span className="gdt-name">
+              {seat.name}
+              {seat.you ? " (you)" : ""}
+            </span>
+            <span className="gdt-status">
               {seat.speaking ? (
                 <span className="eq" aria-label="speaking">
                   <i />
@@ -79,19 +92,16 @@ export function RoundTable({
                   <i />
                 </span>
               ) : (
-                <span className="vtile-dot" aria-hidden />
+                seat.sub
               )}
-              <span className="vtile-name">
-                {seat.name}
-                {seat.you ? " (you)" : ""}
-              </span>
-              {!seat.speaking && seat.sub && <small>{seat.sub}</small>}
-            </div>
-          </div>
+            </span>
+          </li>
         ))}
+      </ul>
+      <div className="gdt-caption" aria-live="polite">
+        {centre}
       </div>
-      <div className="caption-bar">{centre}</div>
-    </div>
+    </section>
   );
 }
 
@@ -206,7 +216,7 @@ function clockOf(seconds: number): string {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
-/** Live speaking time for everyone at the table (M14 FR-14.11), in each orb's colour. */
+/** Live speaking time for everyone at the table (M14 FR-14.11): one stacked bar, then who is who. */
 export function FloorBars({
   floor,
   order,
@@ -219,23 +229,22 @@ export function FloorBars({
   const total = order.reduce((sum, label) => sum + (floor[label] ?? 0), 0);
   return (
     <div className="floor" aria-label="Speaking time so far">
-      {order.map((label) => {
-        const seconds = floor[label] ?? 0;
-        const share = total > 0 ? seconds / total : 0;
-        const fill: CSSProperties = {
-          width: `${Math.round(share * 100)}%`,
-          background: `hsl(${hueFor(label)} 70% 62%)`,
-        };
-        return (
-          <div key={label} className="floor-row">
+      <div className="floor-seg" role="presentation">
+        {order.map((label, i) => {
+          const share = total > 0 ? (floor[label] ?? 0) / total : 0;
+          return share > 0 ? <i key={label} style={{ flexGrow: share, "--i": i } as CSSProperties} /> : null;
+        })}
+        {total === 0 && <i style={{ flexGrow: 1, background: "transparent" }} />}
+      </div>
+      <ul className="floor-key">
+        {order.map((label, i) => (
+          <li key={label} style={{ "--i": i } as CSSProperties}>
+            <span className="floor-dot" aria-hidden />
             <span className="floor-name">{nameOf(label)}</span>
-            <span className="floor-bar" role="presentation">
-              <i style={fill} />
-            </span>
-            <span className="floor-num">{clockOf(seconds)}</span>
-          </div>
-        );
-      })}
+            <span className="floor-num">{clockOf(floor[label] ?? 0)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
