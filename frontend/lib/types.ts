@@ -370,6 +370,8 @@ export interface HistoryOut {
     overall: number;
     dimensions: Record<string, number>;
     created_at: string;
+    needs_review?: boolean;
+    incomplete?: boolean;
   }[];
 }
 

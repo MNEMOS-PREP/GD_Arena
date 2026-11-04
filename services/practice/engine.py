@@ -167,6 +167,8 @@ class PracticeRoom:
         self.idle: asyncio.Task | None = None
         self.warming: asyncio.Task | None = None  # the persona model's connection, opened early
         self.opened = False
+        # What was said before this room object existed (a reconnect): sent to the page so it can show it.
+        self.restored: list[dict] = []
         self.stt_pending = 0  # utterances still being transcribed
         self.playback_done = asyncio.Event()  # the browser finished playing the line
         # Someone (student or persona) has already wrapped the discussion up.
@@ -198,10 +200,39 @@ class PracticeRoom:
             self.personas = {p["label"]: p for p in gd.personas}
             self.moderator = panel.pick_moderator(self.personas)
             self._started_at_gd = gd
+            await self._restore(db)
         warm = getattr(get_persona_llm_provider(), "warm_up", None)
         if warm is not None and self.warming is None:
             self.warming = asyncio.create_task(warm(), name=f"practice-warm-{self.sid}")
         return gd
+
+    async def _restore(self, db) -> None:
+        """A reconnect into a discussion already under way: the room object is new, the discussion is not.
+
+        Without this a returning student found an empty table, the moderator opened the discussion a second
+        time, and nobody remembered who had said what (found by the 2026-11-04 real-life test). The transcript is
+        already on disk (invariant 2), so the room's memory is read back from it: the lines, whose turn it was
+        and how much of the talk each voice has held.
+        """
+        segments = await speech_service.get_transcript(db, self.session_id)
+        if not segments:
+            return
+        names = {label: p["name"] for label, p in self.personas.items()}
+        names[STUDENT_LABEL] = self.student_name
+        for seg in sorted(segments, key=lambda s: s.start):
+            label = seg.candidate_id
+            self.lines.append((names.get(label, label), seg.text))
+            self.restored.append(
+                {"candidate_label": label, "name": names.get(label, label), "text": seg.text}
+            )
+            self._note_turn(label, seg.start, seg.end, seg.text)
+            self.last_speaker = label
+            self.last_text = seg.text
+            self.last_end = max(self.last_end, seg.end)
+            if label == STUDENT_LABEL:
+                self.student_spoke_at = time.monotonic()
+        self.opened = True  # the discussion was opened long ago: never open it again
+        self.last_activity = time.monotonic()
 
     async def start_session(self, user) -> None:
         """Student pressed start: ready up and begin preparation."""
@@ -417,6 +448,9 @@ class PracticeRoom:
             if target:
                 self.redirects += 1
                 self.forced = (self.moderator, "redirect", target)
+        # A personal remark: the moderator answers it before the discussion moves on.
+        if self.moderator and panel.is_rude(text) and not self.forced:
+            self.forced = (self.moderator, "conduct", "")
         await self._announce(STUDENT_LABEL, self.student_display, text, changed, interrupts)
         await self._send_json(server_frame(ServerEvent.USER_TRANSCRIPT, self.sid, {"text": text}))
         self._start_burst(

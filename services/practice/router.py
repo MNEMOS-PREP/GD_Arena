@@ -217,6 +217,9 @@ async def practice_socket(
 
     room = PracticeRoom(factory, session_id, user.full_name, send_json, send_bytes)
     await room.load()
+    # A reconnect into a running discussion: the page is told what was already said.
+    snapshot["transcript"] = room.restored[-40:]
+    snapshot["floor"] = {label: round(seconds, 2) for label, seconds in room.floor.items()}
     await send_json(server_frame(ServerEvent.PRACTICE_READY, str(session_id), snapshot))
     # Reconnecting into a running session resumes the conversation loop.
     if snapshot["session_state"] in {"STARTING", "LIVE"}:

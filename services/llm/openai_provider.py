@@ -21,6 +21,7 @@ import time
 from typing import Any
 
 from services.common.config import settings
+from services.llm import json_repair
 from services.llm.base import (
     LLMError,
     LLMResult,
@@ -405,7 +406,7 @@ class OpenAIProvider:
         by_name = {tool.name: tool for tool in tools}
         invocations: list[ToolInvocation] = []
         input_tokens = output_tokens = 0
-        bad_json_retried = False
+        bad_json_retries = 0
 
         for _round in range(max_rounds):
             try:
@@ -515,11 +516,12 @@ class OpenAIProvider:
             try:
                 data = _parse_json(text)
             except json.JSONDecodeError as exc:
-                if bad_json_retried:
+                if bad_json_retries >= 2:
                     raise LLMError(f"tool-using response was not valid JSON: {exc}") from exc
-                # Asked once more: a dropped comma in a long verdict should not cost
-                # the candidate a whole dimension.
-                bad_json_retried = True
+                # Asked again, up to twice: a dropped comma or a stray quote in a long
+                # verdict should not cost the candidate a whole dimension. (`_parse_json`
+                # has already tried to mend the punctuation.)
+                bad_json_retries += 1
                 messages.append({"role": "assistant", "content": text})
                 messages.append(
                     {
@@ -564,12 +566,12 @@ def _echo_tool_call(call) -> dict[str, Any]:
 def _parse_json(text: str) -> Any:
     """json.loads, tolerating the markdown fence or lead-in prose some vendors add."""
     try:
-        return json.loads(text)
+        return json_repair.loads(text)
     except json.JSONDecodeError:
         start, end = text.find("{"), text.rfind("}")
         if start == -1 or end <= start:
             raise
-        return json.loads(text[start : end + 1])
+        return json_repair.loads(text[start : end + 1])
 
 
 class MisroutedToolCall(Exception):

@@ -88,6 +88,13 @@ class HistoryEntry(BaseModel):
     overall: float
     dimensions: dict[str, float]
     created_at: datetime
+    #: The evaluation flagged this score for a person to look at (an evaluator did not return a result, or it was
+    #: not confident). It is always shown.
+    needs_review: bool = False
+    #: One or more dimensions did not score, so the number was built from fewer than the rubric asks for. Such a
+    #: score is shown but not counted in the average or the trend: a number the system itself does not trust should
+    #: not move the student's.
+    incomplete: bool = False
 
 
 class HistoryOut(BaseModel):
@@ -226,16 +233,19 @@ async def get_my_history(db: SessionDep, user: CurrentUser) -> HistoryOut:
                 overall=score.overall,
                 dimensions=score.dimensions,
                 created_at=score.created_at,
+                needs_review=score.needs_human_review,
+                incomplete=bool((score.metrics or {}).get("missing_dimensions")),
             )
         )
 
-    average = round(sum(e.overall for e in entries) / len(entries), 2) if entries else None
+    trusted = [e for e in entries if not e.incomplete]
+    average = round(sum(e.overall for e in trusted) / len(trusted), 2) if trusted else None
     # Per-dimension averages, so weakness detection has something to work with
     # (design §53 personalization inputs).
     trend: dict[str, float] = {}
-    if entries:
+    if trusted:
         totals: dict[str, list[float]] = {}
-        for entry in entries:
+        for entry in trusted:
             for dimension, value in entry.dimensions.items():
                 totals.setdefault(dimension, []).append(value)
         trend = {d: round(sum(v) / len(v), 3) for d, v in sorted(totals.items())}

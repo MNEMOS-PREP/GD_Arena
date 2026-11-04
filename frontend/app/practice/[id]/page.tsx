@@ -138,13 +138,18 @@ export default function PracticeRoomPage() {
             )
           }
         />
-        <Notices notices={room.notices} nameOf={nameOf} />
+        <Notices notices={room.notices} nameOf={nameOf} youLabel="A" />
       </div>
 
       <div className="stack" style={{ gap: "0.7rem" }}>
         <IdeasStrip ideas={room.ideas} />
         {(live || Object.keys(room.floor).length > 0) && (
           <FloorBars floor={room.floor} order={order} nameOf={nameOf} />
+        )}
+        {room.reconnecting && (
+          <div className="alert alert--error" role="status" style={{ margin: "0 auto" }}>
+            Connection lost. Reconnecting to your discussion; the clock is still running.
+          </div>
         )}
         {(error || room.error || room.micError || camera.error) && (
           <div className="alert alert--error" style={{ margin: "0 auto" }}>
@@ -164,9 +169,9 @@ export default function PracticeRoomPage() {
               placeholder={live ? "Type your point and press Enter" : "The discussion opens when the clock starts"}
               aria-label="Your turn"
               maxLength={600}
-              disabled={!live}
+              disabled={!live || !room.connected}
             />
-            <button type="submit" className="arena-btn arena-btn--primary" disabled={!live || !draft.trim()}>
+            <button type="submit" className="arena-btn arena-btn--primary" disabled={!live || !room.connected || !draft.trim()}>
               Send
             </button>
           </form>

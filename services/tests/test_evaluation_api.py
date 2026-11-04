@@ -193,12 +193,19 @@ async def test_the_group_report_is_host_only(
 
 
 async def test_history_reflects_a_completed_session(
-    client: AsyncClient, evaluated, host_auth, candidate_auth
+    session_factory, client: AsyncClient, evaluated, host_auth, candidate_auth
 ):
     """FR-31."""
+    from sqlalchemy import update
+
+    from services.evaluation.models import CandidateScore
+
     await client.post(
         f"/api/v1/sessions/{evaluated['id']}/evaluate?run_now=true", headers=host_auth
     )
+    async with session_factory() as db:  # the stub scores four dimensions; this one is a whole score
+        await db.execute(update(CandidateScore).values(metrics={"missing_dimensions": []}))
+        await db.commit()
     response = await client.get("/api/v1/me/history", headers=candidate_auth)
 
     assert response.status_code == 200, response.text
@@ -207,6 +214,34 @@ async def test_history_reflects_a_completed_session(
     assert body["average_overall"] is not None
     assert body["trend"]
     assert body["entries"][0]["session_id"] == evaluated["id"]
+
+
+async def test_history_shows_a_flagged_score_but_does_not_count_it(
+    session_factory, client: AsyncClient, evaluated, host_auth, candidate_auth
+):
+    """A score the evaluation flagged for review is listed, marked, and left out of the average and trend."""
+    from sqlalchemy import update
+
+    from services.evaluation.models import CandidateScore
+
+    await client.post(
+        f"/api/v1/sessions/{evaluated['id']}/evaluate?run_now=true", headers=host_auth
+    )
+    async with session_factory() as db:
+        await db.execute(
+            update(CandidateScore).values(
+                needs_human_review=True, metrics={"missing_dimensions": ["behaviour"]}
+            )
+        )
+        await db.commit()
+
+    body = (await client.get("/api/v1/me/history", headers=candidate_auth)).json()
+
+    assert body["sessions_completed"] == 1
+    assert body["entries"][0]["needs_review"] is True
+    assert body["entries"][0]["incomplete"] is True
+    assert body["average_overall"] is None
+    assert body["trend"] == {}
 
 
 async def test_history_is_empty_for_a_new_candidate(client: AsyncClient, candidate_auth):
