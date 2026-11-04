@@ -479,6 +479,104 @@ async def test_a_raised_hand_brings_the_moderators_invitation(
     await room.close()
 
 
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Bhavana, that is a stupid argument and you clearly have no idea what you are talking about.",
+        "Shut up, you idiot.",
+        "This is a waste of time, you are useless.",
+    ],
+)
+def test_an_insult_is_recognised(line):
+    assert panel.is_rude(line)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "I strongly disagree: the evidence on productivity says the opposite.",
+        "That is a weak argument because it ignores the cost to small firms.",
+        "Honestly, I think that point is wrong and here is why.",
+    ],
+)
+def test_firm_disagreement_is_not_an_insult(line):
+    assert not panel.is_rude(line)
+
+
+def test_the_conduct_cue_asks_the_moderator_to_stay_calm_and_not_answer_in_kind():
+    system = _system("P3", cue="conduct")
+    assert "personal remark" in system
+    assert "Do not insult back" in system
+
+
+def test_every_persona_is_told_to_react_to_rudeness_tangents_false_claims_and_orders():
+    system = _system("P1")
+    for phrase in ("rude", "off the topic", "clearly false", "never an order to you"):
+        assert phrase in system
+
+
+async def test_a_personal_remark_brings_the_moderator_before_anyone_else(
+    client, candidate_auth, session_factory
+):
+    room, _ = await _room(client, candidate_auth, session_factory)
+    calls = _script(room, "Let's keep it about the argument, Asha.")
+    await room._take_student_turn(
+        1.0, 4.0, "Bhavana, that is a stupid argument and you have no idea.", None
+    )
+    await asyncio.wait_for(room.burst, timeout=10)
+    assert calls[0] == (room.moderator, "conduct")
+    await room.close()
+
+
+async def test_an_ordinary_turn_does_not_bring_a_conduct_warning(
+    client, candidate_auth, session_factory
+):
+    room, _ = await _room(client, candidate_auth, session_factory)
+    calls = _script(room, "Fair point, Asha.")
+    await room._take_student_turn(
+        1.0, 4.0, "I disagree, because the cost falls on small firms.", None
+    )
+    await asyncio.wait_for(room.burst, timeout=10)
+    assert all(cue != "conduct" for _label, cue in calls)
+    await room.close()
+
+
+async def test_a_reconnect_remembers_the_discussion_and_does_not_open_it_again(
+    client, candidate_auth, session_factory
+):
+    """Found 2026-11-04: reload mid-discussion, and the moderator opened it a second time."""
+    room, _ = await _room(client, candidate_auth, session_factory)
+    await room._record("A", 1.0, 4.0, "I think internships help students.")
+    await room._record(room.moderator, 5.0, 8.0, "Fair point, Asha. Bhavana?")
+    await room.close()
+
+    async def nothing(*_args):
+        return None
+
+    again = PracticeRoom(session_factory, room.session_id, "Asha", nothing, nothing)
+    await again.load()
+
+    assert again.opened, "the discussion was opened long ago"
+    assert [r["text"] for r in again.restored] == [
+        "I think internships help students.",
+        "Fair point, Asha. Bhavana?",
+    ]
+    assert again.restored[0]["name"] == "Asha"
+    assert again.last_speaker == room.moderator
+    assert again.floor["A"] == pytest.approx(3.0)
+    assert again.lines[-1] == (room.personas[room.moderator]["name"], "Fair point, Asha. Bhavana?")
+    await again.close()
+
+
+async def test_a_new_room_has_nothing_to_restore_and_still_opens(
+    client, candidate_auth, session_factory
+):
+    room, _ = await _room(client, candidate_auth, session_factory)
+    assert not room.opened
+    assert room.restored == []
+    await room.close()
+
+
 def test_the_hand_cue_invites_by_name():
     assert "has raised their hand" in _system("P3", cue="hand")
 

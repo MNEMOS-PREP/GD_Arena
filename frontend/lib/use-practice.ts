@@ -38,7 +38,24 @@ interface Snapshot {
   personas: PracticePersona[];
   voice: "elevenlabs" | "browser";
   duration_seconds: number;
+  /** What was said before this connection: a reconnect into a running discussion. */
+  transcript?: { candidate_label: string; name: string; text: string }[];
+  /** Seconds each voice has held the floor so far, so the bars do not start from zero after a reconnect. */
+  floor?: Record<string, number>;
 }
+
+// Typed mode survives a reload: a student who chose it should not be handed a microphone they did not pick.
+const typingKey = (id: string) => `gd.typing.${id}`;
+function typedBefore(id: string | null): boolean {
+  try {
+    return id ? sessionStorage.getItem(typingKey(id)) === "1" : false;
+  } catch {
+    return false;
+  }
+}
+
+// A dropped connection is retried, quickly at first, then every few seconds.
+const RETRY_MS = [1000, 2000, 4000, 5000];
 
 // Voice-activity detection. Frames are ~43 ms at 48 kHz.
 const VOICE_FRAMES_TO_START = 3;
@@ -76,7 +93,9 @@ export function usePractice(sessionId: string | null) {
   const [listening, setListening] = useState(false);
   const [muted, setMuted] = useState(false);
   // Text GD mode (M14 FR-14.19): the student types; the personas still speak.
-  const [typing, setTyping] = useState(false);
+  const [typing, setTyping] = useState(() => typedBefore(sessionId));
+  // The connection dropped and is being retried (the page says so; before this it stayed silent).
+  const [reconnecting, setReconnecting] = useState(false);
 
   const socketRef = useRef<WebSocket | null>(null);
   const liveRef = useRef(false);
@@ -201,6 +220,20 @@ export function usePractice(sessionId: string | null) {
             topic: SocketState["topic"];
           };
           setSnapshot(p);
+          // The server's record is the truth: after a reconnect the table shows what was actually said.
+          if (p.transcript && p.transcript.length > 0) {
+            setCaptions(
+              p.transcript.map((t) => ({
+                id: ++captionSeq,
+                label: t.candidate_label,
+                name: t.name,
+                text: t.text,
+              })),
+            );
+          }
+          if (p.floor && Object.keys(p.floor).length > 0) {
+            setCore((prev) => ({ ...prev, floor: { ...p.floor } }));
+          }
           setCore((prev) =>
             apply(prev, {
               ...frame,
@@ -287,31 +320,50 @@ export function usePractice(sessionId: string | null) {
     if (!sessionId) return;
     const token = tokenStore.access;
     if (!token) return;
-    const socket = new WebSocket(
-      `${API_URL.replace(/^http/, "ws")}/ws/practice/${sessionId}?token=${token}`,
-    );
-    socket.binaryType = "arraybuffer";
-    socketRef.current = socket;
-    socket.onopen = () => setCore((prev) => ({ ...prev, connected: true, error: null }));
-    socket.onclose = (event) =>
-      setCore((prev) => ({
-        ...prev,
-        connected: false,
-        error: event.code >= 4400 ? event.reason || "connection refused" : prev.error,
-      }));
-    socket.onmessage = (message) => {
-      if (typeof message.data === "string") {
-        try {
-          handleFrame(JSON.parse(message.data));
-        } catch {
-          // Ignore a malformed frame rather than dropping the room.
+    let closedByUs = false;
+    let attempt = 0;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+
+    const connect = () => {
+      const socket = new WebSocket(
+        `${API_URL.replace(/^http/, "ws")}/ws/practice/${sessionId}?token=${token}`,
+      );
+      socket.binaryType = "arraybuffer";
+      socketRef.current = socket;
+      socket.onopen = () => {
+        attempt = 0;
+        setReconnecting(false);
+        setCore((prev) => ({ ...prev, connected: true, error: null }));
+      };
+      socket.onclose = (event) => {
+        setCore((prev) => ({
+          ...prev,
+          connected: false,
+          error: event.code >= 4400 ? event.reason || "connection refused" : prev.error,
+        }));
+        // A refusal (4400 and up) or the end of the discussion is final; anything else is a dropped
+        // connection, and the room tries to get back in rather than sitting silent.
+        if (closedByUs || event.code >= 4400 || !liveRef.current) return;
+        setReconnecting(true);
+        retry = setTimeout(connect, RETRY_MS[Math.min(attempt++, RETRY_MS.length - 1)]);
+      };
+      socket.onmessage = (message) => {
+        if (typeof message.data === "string") {
+          try {
+            handleFrame(JSON.parse(message.data));
+          } catch {
+            // Ignore a malformed frame rather than dropping the room.
+          }
+        } else {
+          chunksRef.current.push(message.data as ArrayBuffer);
         }
-      } else {
-        chunksRef.current.push(message.data as ArrayBuffer);
-      }
+      };
     };
+    connect();
     return () => {
-      socket.close();
+      closedByUs = true;
+      if (retry) clearTimeout(retry);
+      socketRef.current?.close();
       socketRef.current = null;
       stopPlayback();
     };
@@ -417,8 +469,13 @@ export function usePractice(sessionId: string | null) {
     void playCtxRef.current.resume();
     if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
     setTyping(true);
+    try {
+      if (sessionId) sessionStorage.setItem(typingKey(sessionId), "1");
+    } catch {
+      /* a private window: typed mode lasts until the page is reloaded */
+    }
     sendJson("START");
-  }, [sendJson]);
+  }, [sendJson, sessionId]);
 
   /** A typed turn. The server waits for a persona's line to finish: typing never cuts in. */
   const sendText = useCallback((text: string): boolean => {
@@ -462,6 +519,7 @@ export function usePractice(sessionId: string | null) {
     listening,
     muted,
     typing,
+    reconnecting,
     start,
     startTyped,
     sendText,

@@ -412,6 +412,10 @@ async def run_job(session: AsyncSession, job: EvaluationJob) -> EvaluationJob:
                     ),
                     "interruption_penalty": score.penalty,
                     "interruption_times": score.interruption_times,
+                    # An evaluator that did not return a result leaves a dimension out; history keeps such a
+                    # score out of the average (it is built from fewer dimensions than the rubric asks for).
+                    "missing_dimensions": score.missing_dimensions,
+                    "review_reasons": score.review_reasons,
                 },
             ),
         )

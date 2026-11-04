@@ -136,6 +136,18 @@ export default function HistoryPage() {
                     })}
                   </small>
                 </div>
+                {entry.needs_review && (
+                  <small
+                    className="view-link"
+                    title={
+                      entry.incomplete
+                        ? "An evaluator did not return a result, so this score is not counted in your average."
+                        : "The evaluation was not confident in this score."
+                    }
+                  >
+                    Needs review
+                  </small>
+                )}
                 <span className={`score-pill score--${tone(entry.overall)}`}>
                   {Math.round(entry.overall)}
                 </span>

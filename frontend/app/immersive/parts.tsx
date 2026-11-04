@@ -269,9 +269,12 @@ export function RingClock({
 export function Notices({
   notices,
   nameOf,
+  youLabel,
 }: {
   notices: TurnNotice[];
   nameOf: (label: string) => string;
+  /** The viewer's own label. When given, only the viewer's interruptions carry the penalty line. */
+  youLabel?: string;
 }) {
   // Newest few only; each fades out of the list as newer ones push it down.
   return (
@@ -281,7 +284,9 @@ export function Notices({
           {n.kind === "interruption" ? (
             <>
               <b>{nameOf(n.by)}</b> cut in on <b>{nameOf(n.target)}</b>
-              <small>Interrupting costs points. Running penalty: −{n.penalty}</small>
+              {(youLabel === undefined || n.by === youLabel) && (
+                <small>Interrupting costs points. Running penalty: −{n.penalty}</small>
+              )}
             </>
           ) : (
             <>
